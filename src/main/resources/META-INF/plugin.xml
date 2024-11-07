@@ -1,0 +1,28 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>de.marlena.plugin</id>
+    <name>WebstormTest</name>
+    <vendor>Marlena Schmidt</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>JavaScript</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <localInspection
+                groupName="Code Smells"
+                displayName="Detect Data Clumps"
+                shortName="DataClumpDetection"
+                enabledByDefault="true"
+                implementationClass="DataClumpDetection"
+                language="JavaScript"/>
+        <postStartupActivity
+                implementation="PostStartupActivity"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener
+                class="listener.PsiChangeListener"
+                topic="com.intellij.psi.PsiTreeChangeListener"/>
+    </applicationListeners>
+
+</idea-plugin>
