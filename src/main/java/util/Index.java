@@ -1,4 +1,4 @@
-package Util;
+package util;
 
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;

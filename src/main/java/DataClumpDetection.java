@@ -1,5 +1,5 @@
-import Util.DataClumpUtil;
-import Util.Index;
+import util.DataClumpUtil;
+import util.Index;
 import com.intellij.codeInspection.*;
 import com.intellij.lang.javascript.psi.JSElementVisitor;
 import com.intellij.lang.javascript.psi.JSParameterList;

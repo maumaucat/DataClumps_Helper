@@ -6,7 +6,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.PsiTreeChangeEvent;
 import com.intellij.psi.PsiTreeChangeListener;
 import org.jetbrains.annotations.NotNull;
-import Util.Index;
+import util.Index;
 
 public class PsiChangeListener implements PsiTreeChangeListener {
 

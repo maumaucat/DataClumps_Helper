@@ -1,4 +1,4 @@
-package Util;
+package util;
 
 import com.intellij.lang.javascript.psi.JSParameterList;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
