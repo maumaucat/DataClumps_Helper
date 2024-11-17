@@ -17,12 +17,9 @@
                 language="JavaScript"/>
         <postStartupActivity
                 implementation="PostStartupActivity"/>
+
     </extensions>
 
-    <applicationListeners>
-        <listener
-                class="listener.PsiChangeListener"
-                topic="com.intellij.psi.PsiTreeChangeListener"/>
-    </applicationListeners>
+
 
 </idea-plugin>
