@@ -60,7 +60,13 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
-        LOG.info("QUICKFIX CODE WIRD AUSGEFÜHRT");
+
+        DataClumpDialog dialog = new DataClumpDialog(this.matching, current, other);
+        if (!dialog.showAndGet()) return;
+        dialog.getData();
+
+
+
 
         PsiDirectory dir = current.getContainingFile().getContainingDirectory();
         String className = "TestClass";
@@ -233,7 +239,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
             classCode.append("  private " + fieldName + ": " + fieldType + ";\n");
         }
 
-
         classCode.append("\n");
         classCode.append("  constructor(");
 
@@ -289,4 +294,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
         return PsiTreeUtil.getChildOfType(psiFile[0], TypeScriptClass.class);
     }
 
+
+    // so dialog (atw) does explode if not there
+    @Override
+    public boolean startInWriteAction() {
+        return false;
+    }
 }

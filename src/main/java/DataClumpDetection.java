@@ -61,7 +61,6 @@ public class DataClumpDetection extends LocalInspectionTool {
         };
     }
 
-
     public static void detectFieldFieldDataClumps(TypeScriptClass currentClass, ProblemsHolder holder) {
         HashMap<TypeScriptClass, List<ClassField>> potentialDataClumps = new HashMap<>();
 
@@ -83,6 +82,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 }
                 potentialDataClumps.get(otherClass).add(classField);
             }
+
         }
 
         for (TypeScriptClass invalidClass : invalidClasses) {
@@ -128,7 +128,6 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
 
-
         // remove all detected invalid functions
         for (TypeScriptFunction invalidFunction : invalidFunctions) {
             Index.getFunctionsToParameters().remove(invalidFunction);
@@ -148,6 +147,4 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
     }
-
-
 }

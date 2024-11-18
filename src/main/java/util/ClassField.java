@@ -1,8 +1,5 @@
 package util;
-import com.intellij.lang.javascript.psi.JSType;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
-import com.intellij.psi.PsiField;
-
 
 public class ClassField extends Property {
 

@@ -1,5 +1,4 @@
 package util;
-
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 
 public class Parameter extends Property{
