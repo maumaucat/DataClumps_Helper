@@ -63,26 +63,23 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         DataClumpDialog dialog = new DataClumpDialog(this.matching, current, other);
         if (!dialog.showAndGet()) return;
-        dialog.getData();
+        String newClassName = dialog.getClassName();
+        List<Property> properties = dialog.getProperties();
+        PsiDirectory newClassDir = dialog.getDirectory();
 
-
-
-
-        PsiDirectory dir = current.getContainingFile().getContainingDirectory();
-        String className = "TestClass";
-        TypeScriptClass extractClass = extractClass(dir, className, matching);
+        TypeScriptClass extractClass = extractClass(newClassDir, newClassName, matching);
 
 
         if (current instanceof TypeScriptClass currentClass) {
-            refactorClass(currentClass, extractClass, matching);
+            refactorClass(currentClass, extractClass, properties);
         } else if (current instanceof TypeScriptFunction currentFunction) {
-            refactorFunction(currentFunction, extractClass, matching);
+            refactorFunction(currentFunction, extractClass, properties);
         }
 
         if (other instanceof TypeScriptClass otherClass) {
-            refactorClass(otherClass, extractClass, matching);
+            refactorClass(otherClass, extractClass, properties);
         } else if (other instanceof TypeScriptFunction otherFunction) {
-            refactorFunction(otherFunction, extractClass, matching);
+            refactorFunction(otherFunction, extractClass, properties);
         }
 
     }
@@ -92,7 +89,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         Project project = psiFunction.getContainingFile().getProject();
         String newParameterName = extractedClass.getQualifiedName();
 
-        introduceParameterObject(project, properties, psiFunction, extractedClass ,newParameterName);
+        introduceParameterObject(project, properties, psiFunction, extractedClass, newParameterName);
 
     }
 
@@ -124,12 +121,16 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     JSAssignmentExpression assignmentExpression = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
                     if (assignmentExpression != null && assignmentExpression.getLOperand().getFirstChild() == reference) {
                         // replace this.fieldname with setter
-                        JSExpression setter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".set_" + field.getName() + "(" + assignmentExpression.getROperand().getText() + ")", psiClass);
-                        assignmentExpression.replace(setter);
+                        WriteCommandAction.runWriteCommandAction(project, () -> {
+                            JSExpression setter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".set_" + field.getName() + "(" + assignmentExpression.getROperand().getText() + ")", psiClass);
+                            assignmentExpression.replace(setter);
+                        });
                     } else { // if no assignment refactor to getter
                         JSExpression oldExpression = (JSExpression) reference.getElement();
-                        JSExpression getter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".get_" + field.getName() + "()", psiClass);
-                        oldExpression.replace(getter);
+                        WriteCommandAction.runWriteCommandAction(project, () -> {
+                            JSExpression getter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".get_" + field.getName() + "()", psiClass);
+                            oldExpression.replace(getter);
+                        });
                     }
                 }
 
@@ -138,8 +139,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
                 if (defaultValue != null) {
                     defaultValues.put(new Property(field.getName(), field.getJSType()),defaultValue.getValue());
                 }*/
-
-                field.delete();
+                WriteCommandAction.runWriteCommandAction(project, () -> {
+                    field.delete();
+                });
             }
         }
 
@@ -153,8 +155,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
             // add initialization
             JSStatement statement = JSPsiElementFactory.createJSStatement("this." + newFieldName + " = " + newParameterName + ";", psiClass);
-            constructor.getBlock().addAfter(statement, constructor.getBlock().getFirstChild());
-
+            WriteCommandAction.runWriteCommandAction(project, () -> {
+                constructor.getBlock().addAfter(statement, constructor.getBlock().getFirstChild());
+            });
         }
     }
 
@@ -165,17 +168,20 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         for (JSParameterListElement parameter : function.getParameters()) {
             Property currentParameter = new Property(parameter.getName(), parameter.getJSType());
-
             originalParameterList.add(currentParameter);
 
             if (properties.contains(currentParameter)) {
                 // refactor calls within the method
                 for (PsiReference reference : ReferencesSearch.search(parameter)) {
-                    JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + ".get_" + parameter.getName() + "()", function);
-                    reference.getElement().replace(getter);
+                    WriteCommandAction.runWriteCommandAction(project, () -> {
+                        JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + ".get_" + parameter.getName() + "()", function);
+                        reference.getElement().replace(getter);
+                    });
                 }
                 // remove parameter
-                parameter.delete();
+                WriteCommandAction.runWriteCommandAction(project, () -> {
+                    parameter.delete();
+                });
             }
         }
 
