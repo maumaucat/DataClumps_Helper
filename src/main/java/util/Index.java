@@ -1,13 +1,15 @@
 package util;
 
-import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
+import com.intellij.lang.javascript.psi.JSArgumentList;
 import com.intellij.lang.javascript.psi.JSField;
+import com.intellij.lang.javascript.psi.JSParameter;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -15,33 +17,30 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiTreeChangeListener;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
-import listener.PsiChangeListener;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 public class Index {
 
-    private static HashMap<Parameter,List<TypeScriptFunction>> parametersToFunctions;
+    private static final Logger LOG = Logger.getInstance(Index.class);
 
-    private static HashMap<ClassField, List<TypeScriptClass>> classFieldsToClasses;
+    private static HashMap<Property,List<TypeScriptFunction>> propertiesToFunctions;
+
+    private static HashMap<Property, List<TypeScriptClass>> propertiesToClasses;
 
     private static HashMap<TypeScriptClass, List<ClassField>> classesToClassFields;
 
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
 
-    private static final Logger LOG = Logger.getInstance(Index.class);
-
-    public static HashMap<Parameter,List<TypeScriptFunction>> getParametersToFunctions() {
-        return parametersToFunctions;
+    public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
+        return propertiesToFunctions;
     }
 
-    public static HashMap<ClassField, List<TypeScriptClass>> getClassFieldsToClasses() {
-        return classFieldsToClasses;
+    public static HashMap<Property, List<TypeScriptClass>> getPropertiesToClasses() {
+        return propertiesToClasses;
     }
 
     public static HashMap<TypeScriptClass, List<ClassField>> getClassesToClassFields() {
@@ -52,67 +51,105 @@ public class Index {
         return functionsToParameters;
     }
 
+    private static List<ClassField> getFields(TypeScriptClass psiClass) {
+        List<ClassField> fields = new ArrayList<>();
+        // iterate all FieldStatements
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.add(new ClassField((TypeScriptField) field));
+
+        }
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                // test if parameter is actually field
+                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
+                    fields.add(new ClassField((TypeScriptParameter) psiParameter));
+                }
+            }
+        }
+        return fields;
+    }
+
+    //TODO überlegen ob mit getFields aus Index zusammenlegen und wohin die funktion gehöhrt
+    public static HashMap<ClassField, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
+        HashMap<ClassField, PsiElement> fields = new HashMap<>();
+        // iterate all FieldStatements
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.put(new ClassField((TypeScriptField) field), field);
+
+        }
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                // test if parameter is actually field
+                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
+                    fields.put(new ClassField((TypeScriptParameter) psiParameter), psiParameter);
+                }
+            }
+        }
+        return fields;
+
+    }
+
+    private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
+        List<Parameter> parameters = new ArrayList<>();
+        for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
+            // invalid / incomplete Parameter
+            if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+            Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
+            parameters.add(parameter);
+        }
+        return parameters;
+    }
+
     public static void addClass(TypeScriptClass psiClass) {
 
         classesToClassFields.put(psiClass, new ArrayList<>());
+        List<ClassField> classFields = getFields(psiClass);
 
-        // iterate all FieldStatements
-        for (JSField field : psiClass.getFields()) {
-            // error handling
-            if (!(field instanceof TypeScriptField)) continue;
-            if (field.getName() == null || field.getJSType() == null) continue;
-
-            ClassField classField = new ClassField((TypeScriptField) field);
+        for (ClassField classField : classFields) {
             classesToClassFields.get(psiClass).add(classField);
             addClassFieldForClass(psiClass, classField);
-
         }
     }
 
     public static void addFunction(TypeScriptFunction psiFunction) {
 
+        if (psiFunction.isConstructor()) return;
+
         functionsToParameters.put(psiFunction, new ArrayList<Parameter>());
+        List<Parameter> parameters = getParameters(psiFunction);
 
         // iterate all Parameters in function
-        for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
-            //TODO Can this happen?
-            if (!(psiParameter instanceof TypeScriptParameter)) continue;
-            if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-            // Parameter schon im index -> Funktion speichern in vorhandener Liste
-            Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
+        for (Parameter parameter : parameters) {
             functionsToParameters.get(psiFunction).add(parameter);
-
             addFunctionForParameter(psiFunction, parameter);
-
         }
     }
 
     public static void updateFunction(TypeScriptFunction psiFunction) {
+
+        if (psiFunction.isConstructor()) return;
 
         if (!functionsToParameters.containsKey(psiFunction)) {
             addFunction(psiFunction);
             return;
         }
 
-        List<Parameter> new_Parameters = new ArrayList<>();
-
-        for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
-            // invalid / incomplete Parameter
-            if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-            Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
-            new_Parameters.add(parameter);
-        }
-
+        List<Parameter> new_Parameters = getParameters(psiFunction);
         List<Parameter> toBeRemoved = new ArrayList<>(functionsToParameters.get(psiFunction));
         toBeRemoved.removeAll(new_Parameters);
-
-        List<Parameter> toBeAdded = new ArrayList<>(new_Parameters);
-        toBeAdded.removeAll(functionsToParameters.get(psiFunction));
 
         functionsToParameters.put(psiFunction, new_Parameters);
 
         for (Parameter parameter : toBeRemoved) {
-            parametersToFunctions.get(parameter).remove(psiFunction);
+            propertiesToFunctions.get(parameter).remove(psiFunction);
         }
 
         for (Parameter parameter: new_Parameters) {
@@ -129,28 +166,18 @@ public class Index {
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
-        List<ClassField> new_Fields = new ArrayList<>();
-        for (JSField psiField : psiClass.getFields()) {
-            // invalid / incomplete Parameter
-            if (psiField.getName() == null || psiField.getJSType() == null) continue;
-            ClassField classField = new ClassField((TypeScriptField) psiField);
-            new_Fields.add(classField);
-        }
+        List<ClassField> new_Fields = getFields(psiClass);
 
         // alle alten KlassenFelder
         List<ClassField> toBeRemoved = new ArrayList<>(classesToClassFields.get(psiClass));
         // alle alten Klassenfelder ohne die, die auch im neuen sind
         toBeRemoved.removeAll(new_Fields);
 
-        // alle neuen KlassenFelder
-        List<ClassField> toBeAdded = new ArrayList<>(new_Fields);
-        //Ohne die, die eh schon da sind
-        toBeAdded.removeAll(classesToClassFields.get(psiClass));
-
+        // eintrag in classes to classFields austauschen
         classesToClassFields.put(psiClass, new_Fields);
 
         for (ClassField classField : toBeRemoved) {
-            classFieldsToClasses.get(classField).remove(psiClass);
+            propertiesToClasses.get(classField).remove(psiClass);
         }
 
         for (ClassField classField: new_Fields) {
@@ -159,35 +186,35 @@ public class Index {
     }
 
     public static void addFunctionForParameter(TypeScriptFunction function, Parameter parameter) {
-        if (parametersToFunctions.containsKey(parameter)) {
+        if (propertiesToFunctions.containsKey(parameter)) {
             // schon eingetragen -> nothing to do
-            if (parametersToFunctions.get(parameter).contains(function)) return;
-            parametersToFunctions.get(parameter).add(function);
+            if (propertiesToFunctions.get(parameter).contains(function)) return;
+            propertiesToFunctions.get(parameter).add(function);
         } else { // ansonsten neuen Eintrag
             List<TypeScriptFunction> functions = new ArrayList<>();
             functions.add(function);
-            parametersToFunctions.put(parameter, functions);
+            propertiesToFunctions.put(parameter, functions);
         }
 
     }
 
-    public static void addClassFieldForClass(TypeScriptClass clazz, ClassField classField) {
+    public static void addClassFieldForClass(TypeScriptClass psiClass, ClassField classField) {
         // wenn schon da add to list
-        if (classFieldsToClasses.containsKey(classField)) {
+        if (propertiesToClasses.containsKey(classField)) {
             // wenn bereits eingetragen nothing to do
-            if (classFieldsToClasses.get(classField).contains(clazz)) return;
-            classFieldsToClasses.get(classField).add(clazz);
+            if (propertiesToClasses.get(classField).contains(psiClass)) return;
+            propertiesToClasses.get(classField).add(psiClass);
         } else { // sonst neuer Eintrag
             List<TypeScriptClass> classList = new ArrayList<>();
-            classList.add(clazz);
-            classFieldsToClasses.put(classField, classList);
+            classList.add(psiClass);
+            propertiesToClasses.put(classField, classList);
         }
     }
 
     public static void resetIndex(Project project) {
 
-        parametersToFunctions = new HashMap<>();
-        classFieldsToClasses = new HashMap<>();
+        propertiesToFunctions = new HashMap<>();
+        propertiesToClasses = new HashMap<>();
         classesToClassFields = new HashMap<>();
         functionsToParameters = new HashMap<>();
 
@@ -217,16 +244,13 @@ public class Index {
         printParametersToFunctions();
         printClassesToClassFields();
         printFunctionsToParameter();
-
-        //TODO replace project with whatever intellij actually wants
-        //PsiManager.getInstance(project).addPsiTreeChangeListener(new PsiChangeListener(), project);
     }
 
     public static void printClassFieldsToClasses() {
         ApplicationManager.getApplication().runReadAction(() -> {
         LOG.info("ClassField to classes");
-        for (ClassField classField : classFieldsToClasses.keySet()) {
-            List<TypeScriptClass> classList = classFieldsToClasses.get(classField);
+        for (Property classField : propertiesToClasses.keySet()) {
+            List<TypeScriptClass> classList = propertiesToClasses.get(classField);
             StringBuilder classes = new StringBuilder("[");
             for (TypeScriptClass typeScriptClass : classList) {
                 classes.append(typeScriptClass.getName()).append(",");
@@ -240,8 +264,8 @@ public class Index {
     public static void printParametersToFunctions() {
         ApplicationManager.getApplication().runReadAction(() -> {
         LOG.info("Parameters to Functions");
-        for (Parameter parameter : parametersToFunctions.keySet()) {
-            List<TypeScriptFunction> functions = parametersToFunctions.get(parameter);
+        for (Property parameter : propertiesToFunctions.keySet()) {
+            List<TypeScriptFunction> functions = propertiesToFunctions.get(parameter);
             StringBuilder parameters = new StringBuilder("[");
             for (TypeScriptFunction function : functions) {
                 parameters.append(function.getName()).append(",");

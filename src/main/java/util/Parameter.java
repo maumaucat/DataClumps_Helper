@@ -1,5 +1,7 @@
 package util;
+import com.intellij.lang.javascript.psi.JSType;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import org.jetbrains.annotations.Nullable;
 
 public class Parameter extends Property{
 
@@ -7,15 +9,14 @@ public class Parameter extends Property{
         super(parameter.getName(), parameter.getJSType());
     }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof Parameter otherParameter)) return false;
-        return otherParameter.getName().equals(this.getName()) &&
-                otherParameter.getType().equals(this.getType());
+    public Parameter(String name, JSType type) {
+        super(name, type);
     }
+
 
     @Override
     public String toString() {
         return "[Parameter: name=" + this.getName() + ", type=" + this.getType() + "]";
     }
+
 }

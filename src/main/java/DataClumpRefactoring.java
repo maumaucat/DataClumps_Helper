@@ -1,257 +1,265 @@
-import com.esotericsoftware.kryo.kryo5.minlog.Log;
-import com.google.protobuf.DescriptorProtos;
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.util.IntentionFamilyName;
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
-import com.intellij.lang.javascript.buildTools.JSPsiUtil;
 import com.intellij.lang.javascript.psi.*;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
-import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
-
-import com.intellij.lang.typescript.psi.TypeScriptPsiUtil;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
-import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
-import util.Property;
-import util.PsiUtil;
+import util.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-
+import java.util.*;
 
 public class DataClumpRefactoring implements LocalQuickFix {
 
-    List<Property> matching;
-    PsiElement current;
-    PsiElement other;
-
     private static final Logger LOG = Logger.getInstance(DataClumpRefactoring.class);
 
+    private final List<Property> matchingProperties;
+    private final PsiElement currentElement;
+    private final PsiElement otherElement;
 
-    public DataClumpRefactoring(PsiElement current, PsiElement other, List<Property> matching) {
-        this.matching = matching;
-        this.current = current;
-        this.other = other;
+    public DataClumpRefactoring(PsiElement currentElement, PsiElement otherElement, List<Property> matchingProperties) {
+        this.matchingProperties = matchingProperties;
+        this.currentElement = currentElement;
+        this.otherElement = otherElement;
     }
 
     @Override
     public @IntentionFamilyName @NotNull String getFamilyName() {
-        if (other instanceof TypeScriptClass) {
-            return "Refactor Data Clump with " + ((TypeScriptClass) other).getQualifiedName();
-        } else if (other instanceof TypeScriptFunction) {
-            return "Refactor Data Clump with " + ((TypeScriptFunction) other).getQualifiedName();
+        if (otherElement instanceof TypeScriptClass) {
+            return "Refactor Data Clump with " + ((TypeScriptClass) otherElement).getQualifiedName();
+        } else if (otherElement instanceof TypeScriptFunction) {
+            return "Refactor Data Clump with " + ((TypeScriptFunction) otherElement).getQualifiedName();
         }
-        return "Refactor data clump(error)";
+        return "Refactor Data Clump (Error)";
     }
 
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
 
-        DataClumpDialog dialog = new DataClumpDialog(this.matching, current, other);
+        DataClumpDialog dialog = new DataClumpDialog(matchingProperties, currentElement, otherElement);
+
         if (!dialog.showAndGet()) return;
-        String newClassName = dialog.getClassName();
-        List<Property> properties = dialog.getProperties();
-        PsiDirectory newClassDir = dialog.getDirectory();
 
-        TypeScriptClass extractClass = extractClass(newClassDir, newClassName, matching);
+        String className = dialog.getClassName();
+        List<Property> selectedProperties = dialog.getProperties();
+        PsiDirectory targetDirectory = dialog.getDirectory();
 
+        // Erstellen der neuen Klasse
+        TypeScriptClass extractedClass = extractClass(targetDirectory, className, selectedProperties);
 
-        if (current instanceof TypeScriptClass currentClass) {
-            refactorClass(currentClass, extractClass, properties);
-        } else if (current instanceof TypeScriptFunction currentFunction) {
-            refactorFunction(currentFunction, extractClass, properties);
+        // Refaktorieren der beteiligten Elemente
+        refactorElement(currentElement, extractedClass, selectedProperties);
+        refactorElement(otherElement, extractedClass, selectedProperties);
+    }
+
+    private void refactorElement(PsiElement element, TypeScriptClass extractedClass, List<Property> properties) {
+        if (element instanceof TypeScriptClass) {
+            refactorClass((TypeScriptClass) element, extractedClass, properties);
+        } else if (element instanceof TypeScriptFunction) {
+            refactorFunction((TypeScriptFunction) element, extractedClass, properties);
         }
+    }
 
-        if (other instanceof TypeScriptClass otherClass) {
-            refactorClass(otherClass, extractClass, properties);
-        } else if (other instanceof TypeScriptFunction otherFunction) {
-            refactorFunction(otherFunction, extractClass, properties);
-        }
+    private void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties) {
+        String fieldName = extractedClass.getName().toLowerCase();
+
+        // Neues Feld hinzufügen
+        addNewFieldToClass(psiClass, extractedClass, fieldName);
+
+        // Verwendungen der Eigenschaften aktualisieren
+        updateFieldReferences(psiClass, properties, fieldName);
+
+        // Konstruktor aktualisieren
+        updateConstructor(psiClass, properties, extractedClass, fieldName);
 
     }
 
-    public static void refactorFunction(TypeScriptFunction psiFunction, TypeScriptClass extractedClass, List<Property> properties) {
+    private void addNewFieldToClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, String fieldName) {
 
-        Project project = psiFunction.getContainingFile().getProject();
-        String newParameterName = extractedClass.getQualifiedName();
+        ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
+                psiClass, fieldName, extractedClass.getJSType(), "private"
+        );
 
-        introduceParameterObject(project, properties, psiFunction, extractedClass, newParameterName);
+        PsiElement[] existingFields = psiClass.getFields();
+        PsiElement insertPosition = (existingFields.length > 0)
+                ? PsiTreeUtil.getParentOfType(existingFields[existingFields.length - 1], ES6FieldStatementImpl.class)
+                : PsiTreeUtil.getChildOfType(psiClass, TypeScriptFunction.class);
 
-    }
-
-    public void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties) {
-
-        Project project = psiClass.getProject();
-        String newFieldName = extractedClass.getName().toLowerCase();
-        String newParameterName = newFieldName;
-
-        // add new field
-        ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(psiClass, newFieldName, extractedClass.getJSType(), "private");
-
-        WriteCommandAction.runWriteCommandAction(project, () -> {
-            PsiElement[] fields = psiClass.getFields();
-            if (fields.length > 0) {
-                psiClass.addBefore(newFieldStatement, PsiTreeUtil.getParentOfType(fields[fields.length - 1], ES6FieldStatementImpl.class));
-            } else {
-                // sollte nicht passieren können
-                LOG.error("refactored class has no fields");
-            }
+        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+            psiClass.addBefore(newFieldStatement, insertPosition);
         });
 
-        //HashMap<Property,Object> defaultValues = new HashMap();
+    }
 
-        for (JSField field : psiClass.getFields()) {
-            if (properties.contains(new Property(field.getName(), field.getJSType()))) {
-                for (PsiReference reference : ReferencesSearch.search(field)) {
+    private void updateConstructor(TypeScriptClass psiClass, List<Property> properties, TypeScriptClass extractedClass, String fieldName) {
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor == null) return;
+
+        introduceParameterObject(properties, constructor, extractedClass, fieldName);
+
+        //TODO remove calls like: this.person.name = person.name;
+        JSStatement initialization = JSPsiElementFactory.createJSStatement(
+                "this." + fieldName + " = " + fieldName + ";", psiClass
+        );
+
+        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+            constructor.getBlock().addAfter(initialization, constructor.getBlock().getFirstChild());
+        });
+
+    }
+
+    private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
+
+        HashMap<ClassField,PsiElement> fieldsToElement = Index.getFieldsToElement(psiClass);
+
+        for (Map.Entry<ClassField,PsiElement> entry : fieldsToElement.entrySet()) {
+            ClassField field = entry.getKey();
+            PsiElement element = entry.getValue();
+
+            if (properties.contains(field)) {
+                for (PsiReference reference : ReferencesSearch.search(element)) {
                     // if it is assignment -> refactor to setter
                     JSAssignmentExpression assignmentExpression = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
                     if (assignmentExpression != null && assignmentExpression.getLOperand().getFirstChild() == reference) {
-                        // replace this.fieldname with setter
-                        WriteCommandAction.runWriteCommandAction(project, () -> {
-                            JSExpression setter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".set_" + field.getName() + "(" + assignmentExpression.getROperand().getText() + ")", psiClass);
-                            assignmentExpression.replace(setter);
-                        });
+                        replaceAssignmentWithSetter(assignmentExpression, fieldName, field);
                     } else { // if no assignment refactor to getter
-                        JSExpression oldExpression = (JSExpression) reference.getElement();
-                        WriteCommandAction.runWriteCommandAction(project, () -> {
-                            JSExpression getter = JSPsiElementFactory.createJSExpression("this." + newFieldName + ".get_" + field.getName() + "()", psiClass);
-                            oldExpression.replace(getter);
-                        });
+                        replaceReferenceWithGetter(reference, fieldName, field);
                     }
                 }
 
-                // default Werte merken
-                /*JSLiteralExpression defaultValue = PsiTreeUtil.getChildOfType(field, JSLiteralExpression.class);
-                if (defaultValue != null) {
-                    defaultValues.put(new Property(field.getName(), field.getJSType()),defaultValue.getValue());
-                }*/
-                WriteCommandAction.runWriteCommandAction(project, () -> {
-                    field.delete();
-                });
+                if (element instanceof TypeScriptField) {
+                    WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+                        element.delete();
+                    });
+                }
             }
-        }
-
-        // constructor
-        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-        if (constructor != null) {
-
-            introduceParameterObject(project, properties, constructor, extractedClass, newParameterName);
-
-            //TODO remove calls like: this.testclass.set_name(testclass.get_name());
-
-            // add initialization
-            JSStatement statement = JSPsiElementFactory.createJSStatement("this." + newFieldName + " = " + newParameterName + ";", psiClass);
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                constructor.getBlock().addAfter(statement, constructor.getBlock().getFirstChild());
-            });
         }
     }
 
-    public static void introduceParameterObject(Project project, List<Property> properties, TypeScriptFunction function, TypeScriptClass extractedClass, String newParameterName) {
+    private void replaceAssignmentWithSetter(JSAssignmentExpression assignment, String fieldName, ClassField field) {
+        JSExpression newExpression = JSPsiElementFactory.createJSExpression(
+                "this." + fieldName + "." + field.getName() + " = " + assignment.getROperand().getText(), assignment
+        );
+        WriteCommandAction.runWriteCommandAction(assignment.getProject(), () -> {
+            assignment.replace(newExpression);
+        });
+    }
 
-        // save aufbau of originalParameterList and remove all Paramaters that will be replaced by Object
-        List<Property> originalParameterList = new ArrayList<>();
+    private void replaceReferenceWithGetter(PsiReference reference, String fieldName, ClassField field) {
+        JSExpression newExpression = JSPsiElementFactory.createJSExpression(
+                "this." + fieldName + "." + field.getName(), reference.getElement()
+        );
+        WriteCommandAction.runWriteCommandAction(reference.getElement().getProject(), () -> {
+            reference.getElement().replace(newExpression);
+        });
+    }
 
+    public static void refactorFunction(TypeScriptFunction psiFunction, TypeScriptClass extractedClass, List<Property> properties) {
+        String newParameterName = extractedClass.getQualifiedName();
+
+        introduceParameterObject(properties, psiFunction, extractedClass, newParameterName);
+
+    }
+
+
+    public static void introduceParameterObject(List<Property> properties, TypeScriptFunction function, TypeScriptClass extractedClass, String newParameterName) {
+
+        Project project = function.getProject();
+        List<Property> originalParameters = new ArrayList<>();
+
+        // Process the function's current parameters
         for (JSParameterListElement parameter : function.getParameters()) {
-            Property currentParameter = new Property(parameter.getName(), parameter.getJSType());
-            originalParameterList.add(currentParameter);
+            Property currentProperty = new Parameter((TypeScriptParameter) parameter);
+            originalParameters.add(currentProperty);
 
-            if (properties.contains(currentParameter)) {
-                // refactor calls within the method
+            // Replace references to selected parameters with getter calls on the new object
+            if (properties.contains(currentProperty)) {
                 for (PsiReference reference : ReferencesSearch.search(parameter)) {
+                    JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + "." + parameter.getName(), function);
                     WriteCommandAction.runWriteCommandAction(project, () -> {
-                        JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + ".get_" + parameter.getName() + "()", function);
                         reference.getElement().replace(getter);
                     });
                 }
-                // remove parameter
-                WriteCommandAction.runWriteCommandAction(project, () -> {
-                    parameter.delete();
-                });
+                // Remove the parameter from the function's signature
+                WriteCommandAction.runWriteCommandAction(project, parameter::delete);
             }
         }
 
-        // add extracted class as new Parameter
+        // Add the extracted class as a new parameter
         JSParameterList parameterList = function.getParameterList();
-        TypeScriptParameter newParameter = PsiUtil.createTypeScriptParameter(function, newParameterName , extractedClass.getJSType());
+        TypeScriptParameter newParameter = PsiUtil.createTypeScriptParameter(function, newParameterName, extractedClass.getJSType());
         PsiUtil.addParameterToParameterList(newParameter, parameterList);
 
-        // I need this for down there
-        List<Property> extractedParameterList = new ArrayList<>();
+        // Gather properties from the extracted class constructor
+        List<Property> extractedConstructorParameters = new ArrayList<>();
         for (JSParameterListElement parameter : extractedClass.getConstructor().getParameters()) {
-            extractedParameterList.add(new Property(parameter.getName(), parameter.getJSType()));
+            extractedConstructorParameters.add(new Parameter(parameter.getName().substring(1), parameter.getJSType()));
         }
 
-        // find all calls of the function and refactor them
-        for (PsiReference call : ReferencesSearch.search(function)) {
-
-            JSArgumentList argumentList = PsiTreeUtil.getNextSiblingOfType(call.getElement(), JSArgumentList.class);
+        // Update all calls to the function to use the new parameter object
+        for (PsiReference functionCall : ReferencesSearch.search(function)) {
+            JSArgumentList argumentList = PsiTreeUtil.getNextSiblingOfType(functionCall.getElement(), JSArgumentList.class);
             JSExpression[] originalArguments = argumentList.getArguments();
-
-            StringBuilder newArgumentListString = new StringBuilder("(");
+            StringBuilder updatedArguments = new StringBuilder("(");
 
             for (JSParameterListElement parameter : function.getParameters()) {
-
                 if (parameter.getJSType().equals(extractedClass.getJSType())) {
-
-                    newArgumentListString.append("new " + extractedClass.getName() + "(");
-                    for (Property property : extractedParameterList) {
-                        newArgumentListString.append(originalArguments[originalParameterList.indexOf(property)].getText());
-                        newArgumentListString.append(",");
+                    // Replace with a constructor call for the new parameter object
+                    updatedArguments.append("new ").append(extractedClass.getName()).append("(");
+                    for (Property property : extractedConstructorParameters) {
+                        updatedArguments.append(originalArguments[originalParameters.indexOf(property)].getText()).append(", ");
                     }
-                    newArgumentListString.deleteCharAt(newArgumentListString.length() - 1);
-                    newArgumentListString.append(")");
+                    // Remove trailing comma
+                    if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
+                        updatedArguments.setLength(updatedArguments.length() - 2);
+                    }
+                    updatedArguments.append(")");
                 } else {
-                    newArgumentListString.append(originalArguments[originalParameterList.indexOf(new Property(parameter.getName(), parameter.getJSType()))].getText());
+                    // Append remaining original arguments
+                    updatedArguments.append(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) parameter))].getText());
                 }
-                newArgumentListString.append(",");
+                updatedArguments.append(", ");
             }
-            newArgumentListString.deleteCharAt(newArgumentListString.length() - 1);
-            newArgumentListString.append(")");
 
+            // Remove trailing comma and close the argument list
+            if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
+                updatedArguments.setLength(updatedArguments.length() - 2);
+            }
+            updatedArguments.append(")");
+
+            // Update the function call with the new argument list
             WriteCommandAction.runWriteCommandAction(project, () -> {
-                JSExpression newerParameterList = JSPsiElementFactory.createJSExpression(newArgumentListString.toString(), argumentList);
-                LOG.info(newerParameterList.getText());
-                argumentList.replace(newerParameterList);
+                JSExpression newArguments = JSPsiElementFactory.createJSExpression(updatedArguments.toString(), argumentList);
+                argumentList.replace(newArguments);
             });
-
         }
     }
+
 
     public TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields) {
 
         //TODO Formatter?
         StringBuilder classCode = new StringBuilder();
-        classCode.append("class " + className + " {\n");
+        classCode.append("class " + className + " {\n\n");
 
-        // 2. Füge Klassenvariablen und den Konstruktor hinzu
-        for (Property field : fields) {
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-            classCode.append("  private " + fieldName + ": " + fieldType + ";\n");
-        }
-
-        classCode.append("\n");
+        // constructor
         classCode.append("  constructor(");
 
         for (Property field : fields) {
             final String fieldName = field.getName();
             final String fieldType = field.getType().getTypeText();
-            classCode.append(fieldName + ": " + fieldType + ", ");
+            classCode.append("private _" + fieldName + ": " + fieldType + ", ");
         }
 
         // Entferne das letzte Komma und Leerzeichen
@@ -259,26 +267,18 @@ public class DataClumpRefactoring implements LocalQuickFix {
             classCode.setLength(classCode.length() - 2);
         }
 
-        classCode.append(") {\n");
+        classCode.append(") {}\n\n");
 
+        // Getter- und Setter
         for (Property field : fields) {
             final String fieldName = field.getName();
             final String fieldType = field.getType().getTypeText();
-            classCode.append("    this." + fieldName + " = " + fieldName + ";\n");
-        }
-
-        classCode.append("  }\n\n");
-
-        // 3. Füge Getter- und Setter-Methoden hinzu
-        for (Property field : fields) {
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-            classCode.append("  get_" + fieldName + "(): " + fieldType + " {\n");
-            classCode.append("    return this." + fieldName + ";\n");
+            classCode.append("  public get " + fieldName + "(): " + fieldType + " {\n");
+            classCode.append("    return this._" + fieldName + ";\n");
             classCode.append("  }\n\n");
 
-            classCode.append("  set_" + fieldName + "(value: " + fieldType + ") {\n");
-            classCode.append("    this." + fieldName + " = value;\n");
+            classCode.append("  set " + fieldName + "(value: " + fieldType + ") {\n");
+            classCode.append("    this._" + fieldName + " = value;\n");
             classCode.append("  }\n\n");
         }
 

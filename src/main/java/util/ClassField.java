@@ -1,5 +1,7 @@
 package util;
+import com.intellij.lang.javascript.psi.JSType;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
+import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 
 public class ClassField extends Property {
 
@@ -10,26 +12,23 @@ public class ClassField extends Property {
         this.visibility = field.getAccessType().toString();
     }
 
-    @Override
-    public int hashCode() {
-        return super.hashCode() + visibility.hashCode();
+    public ClassField(TypeScriptParameter parameter) {
+        super(parameter.getName(), parameter.getJSType());
+        this.visibility = parameter.getAccessType().toString();
     }
 
     public String getVisibility() {
         return visibility;
     }
 
-
-    @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof ClassField otherField)) return false;
-        return otherField.getName().equals(this.getName()) &&
-                otherField.getType().equals(this.getType()) &&
-                otherField.getVisibility().equals(this.getVisibility());
-    }
-
     @Override
     public String toString() {
         return "[ClassField: name=" + this.getName() + ", type=" + this.getType() + ", visibility=" + this.getVisibility() + "]";
+    }
+
+    public boolean matches(ClassField field) {
+        return this.getName().equals(field.getName())
+                && this.getType().equals(field.getType())
+                && this.getVisibility().equals(field.getVisibility());
     }
 }

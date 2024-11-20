@@ -2,7 +2,7 @@ import com.intellij.lang.javascript.psi.JSField;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
-import com.intellij.psi.PsiClass;
+import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.psi.PsiElement;
 import util.ClassField;
 import util.Index;
@@ -20,6 +20,7 @@ import util.Parameter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 //TODO beautify delete when invalid
@@ -37,113 +38,160 @@ public class DataClumpDetection extends LocalInspectionTool {
             @Override
             public void visitJSParameterList(@NotNull JSParameterList parameterList) {
                 TypeScriptFunction psiFunction = PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class);
-                Index.updateFunction(psiFunction);
-                //Index.printParametersToFunctions();
-
-                if (parameterList.getParameters().length >= MIN_DATACLUMPS) {
-                    detectParameterParameterDataClumps(psiFunction, holder);
+                if (psiFunction.isConstructor()) {
+                    TypeScriptClass psiClass = PsiTreeUtil.getParentOfType(psiFunction, TypeScriptClass.class);
+                    Index.updateClass(psiClass);
+                    detectDataClumpForField(psiClass, holder);
                 }
-
+                else {
+                    Index.updateFunction(psiFunction);
+                    if (parameterList.getParameters().length >= MIN_DATACLUMPS) {
+                        detectDataClumpForFunction(psiFunction, holder);
+                    }
+                }
                 super.visitJSParameterList(parameterList);
             }
 
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass typeScriptClass) {
                 Index.updateClass(typeScriptClass);
-                //Index.printClassFieldsToClasses();
-
                 if (typeScriptClass.getFields().length >= MIN_DATACLUMPS) {
-                    detectFieldFieldDataClumps(typeScriptClass, holder);
+                    detectDataClumpForField(typeScriptClass, holder);
                 }
-
                 super.visitTypeScriptClass(typeScriptClass);
             }
         };
     }
 
-    public static void detectFieldFieldDataClumps(TypeScriptClass currentClass, ProblemsHolder holder) {
-        HashMap<TypeScriptClass, List<ClassField>> potentialDataClumps = new HashMap<>();
 
-        List<TypeScriptClass> invalidClasses = new ArrayList<>();
+    public static void detectDataClumpForField(TypeScriptClass currentClass, ProblemsHolder holder) {
+        LOG.info(currentClass.getName());
 
-        // all classfields of the class
-        for (ClassField classField : Index.getClassesToClassFields().get(currentClass)) {
-            // all casses with that classfield
-            for (TypeScriptClass otherClass : Index.getClassFieldsToClasses().get(classField)) {
+        HashMap<TypeScriptClass, List<ClassField>> potentialFieldFieldDataClumps = new HashMap<>();
+        HashMap<TypeScriptFunction, List<ClassField>> potentialFieldParameterDataClumps = new HashMap<>();
+
+        // all Properties/Classfields the class has
+        for (ClassField classfield : Index.getClassesToClassFields().get(currentClass)) {
+            // alle Klassen die eine passende Property haben
+            for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(classfield)) {
                 if (otherClass == currentClass) continue;
-                // remove invalid classes
-                if (!otherClass.isValid()) {
-                    invalidClasses.add(otherClass);
-                    continue;
+                if(!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
+
+                List<ClassField> classFieldList = Index.getClassesToClassFields().get(otherClass);
+                if (classFieldList.get(classFieldList.indexOf(classfield)).matches(classfield)) {
+                    // add to Map
+                    if (!potentialFieldFieldDataClumps.containsKey(otherClass)) {
+                        potentialFieldFieldDataClumps.put(otherClass, new ArrayList<>());
+                    }
+                    potentialFieldFieldDataClumps.get(otherClass).add(classfield);
                 }
 
-                if (!potentialDataClumps.containsKey(otherClass)) {
-                    potentialDataClumps.put(otherClass, new ArrayList<>());
-                }
-                potentialDataClumps.get(otherClass).add(classField);
             }
 
+            // alle Funktionen, die eine passende Property haben
+            if (!Index.getPropertiesToFunctions().containsKey(classfield)) continue;
+            for (TypeScriptFunction otherFunction : Index.getPropertiesToFunctions().get(classfield)) {
+                if (!otherFunction.isValid()) continue; // TODO DELETE INVALID ENTRIES
+
+                // add to Map
+                if (!potentialFieldParameterDataClumps.containsKey(otherFunction)) {
+                    potentialFieldParameterDataClumps.put(otherFunction, new ArrayList<>());
+                }
+                potentialFieldParameterDataClumps.get(otherFunction).add(classfield);
+            }
         }
 
-        for (TypeScriptClass invalidClass : invalidClasses) {
-            Index.getClassesToClassFields().remove(invalidClass);
-        }
+        HashMap<ClassField,PsiElement> currentFields = Index.getFieldsToElement(currentClass);
 
-        for (TypeScriptClass otherClass : potentialDataClumps.keySet()) {
-            List<ClassField> matchingFields = potentialDataClumps.get(otherClass);
-            // actually a  data clump
+        for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
+            List<ClassField> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
-
-                // alle doppelten Fields makieren
-                for (JSField psiField : currentClass.getFields()) {
-                    if (matchingFields.contains(new ClassField((TypeScriptField) psiField))) {
-                        holder.registerProblem(psiField, "Data Clump with Class " + otherClass.getName() +
+                for (Map.Entry<ClassField,PsiElement> entry : currentFields.entrySet()) {
+                    if (matchingFields.contains(entry.getKey())){
+                        holder.registerProblem(entry.getValue(), "Data Clump with Class " + otherClass.getName() +
                                 ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherClass, new ArrayList<>(matchingFields)));
                     }
                 }
             }
+
         }
 
+        for (TypeScriptFunction otherFunction : potentialFieldParameterDataClumps.keySet()) {
+            List<ClassField> matchingFields = potentialFieldParameterDataClumps.get(otherFunction);
+            if (matchingFields.size() >= MIN_DATACLUMPS) {
+                for (Map.Entry<ClassField,PsiElement> entry : currentFields.entrySet()) {
+                    if (matchingFields.contains(entry.getKey())) {
+                        holder.registerProblem(entry.getValue(), "Data Clump with Function " + otherFunction.getName() +
+                                ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherFunction, new ArrayList<>(matchingFields)));
+                    }
+                }
+
+            }
+        }
     }
 
-    public static void detectParameterParameterDataClumps(TypeScriptFunction currentFunction, ProblemsHolder holder) {
 
-        HashMap<TypeScriptFunction, List<Parameter>> potentialDataClumps = new HashMap<>();
 
-        List<TypeScriptFunction> invalidFunctions = new ArrayList<>();
+    public static void detectDataClumpForFunction(TypeScriptFunction currentFunction, ProblemsHolder holder) {
+        LOG.info(currentFunction.getName());
+        if (currentFunction.isConstructor()) return;
+        HashMap<TypeScriptClass, List<Parameter>> potentialParameterFieldDataClumps = new HashMap<>();
+        HashMap<TypeScriptFunction, List<Parameter>> potentialParameterParameterDataClumps = new HashMap<>();
 
+        // all Properties/Parameter the class has
         for (Parameter parameter : Index.getFunctionsToParameters().get(currentFunction)) {
-            for (TypeScriptFunction otherFunction : Index.getParametersToFunctions().get(parameter)) {
-                if (otherFunction == currentFunction) continue;
-                // remove invalid classes
-                if (!otherFunction.isValid()) {
-                    invalidFunctions.add(otherFunction);
-                    continue;
-                }
 
-                if (!potentialDataClumps.containsKey(otherFunction)) {
-                    potentialDataClumps.put(otherFunction, new ArrayList<>());
+            // alle Funktionen, die eine passende Property haben
+            for (TypeScriptFunction otherFunction : Index.getPropertiesToFunctions().get(parameter)) {
+                if (otherFunction == currentFunction) continue;
+                if (!otherFunction.isValid()) continue; // TODO DELETE INVALID ENTRIES
+
+                // add to Map
+                if (!potentialParameterParameterDataClumps.containsKey(otherFunction)) {
+                    potentialParameterParameterDataClumps.put(otherFunction, new ArrayList<>());
                 }
-                potentialDataClumps.get(otherFunction).add(parameter);
+                potentialParameterParameterDataClumps.get(otherFunction).add(parameter);
+            }
+
+            // alle Klassen die eine passende Property haben
+            if (!Index.getPropertiesToClasses().containsKey(parameter)) continue;
+            for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(parameter)) {
+                if(!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
+
+                // add to Map
+                if (!potentialParameterFieldDataClumps.containsKey(otherClass)) {
+                    potentialParameterFieldDataClumps.put(otherClass, new ArrayList<>());
+                }
+                potentialParameterFieldDataClumps.get(otherClass).add(parameter);
+
             }
         }
 
-        // remove all detected invalid functions
-        for (TypeScriptFunction invalidFunction : invalidFunctions) {
-            Index.getFunctionsToParameters().remove(invalidFunction);
-        }
-
-        for (TypeScriptFunction otherFunction : potentialDataClumps.keySet()) {
-            List<Parameter> matchingParameter = potentialDataClumps.get(otherFunction);
+        for (TypeScriptClass otherClass : potentialParameterFieldDataClumps.keySet()) {
+            List<Parameter> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
             if (matchingParameter.size() >= MIN_DATACLUMPS) {
                 for (JSParameterListElement psiParameter : currentFunction.getParameters())
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
-                    holder.registerProblem(psiParameter, "Data Clump with Function " +
-                                    otherFunction.getName() +
-                                    ". Identified Parameter: "
-                                    + matchingParameter + ".",
-                            new DataClumpRefactoring(currentFunction, otherFunction, new ArrayList<>(matchingParameter)));
+                        holder.registerProblem(psiParameter, "Data Clump with Class " +
+                                        otherClass.getName() +
+                                        ". Identified Parameter: "
+                                        + matchingParameter + ".",
+                                new DataClumpRefactoring(currentFunction, otherClass, new ArrayList<>(matchingParameter)));
+                    }
                 }
+            }
+
+        for (TypeScriptFunction otherFunction : potentialParameterParameterDataClumps.keySet()) {
+            List<Parameter> matchingParameter = potentialParameterParameterDataClumps.get(otherFunction);
+            if (matchingParameter.size() >= MIN_DATACLUMPS) {
+                for (JSParameterListElement psiParameter : currentFunction.getParameters())
+                    if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
+                        holder.registerProblem(psiParameter, "Data Clump with Function " +
+                                        otherFunction.getName() +
+                                        ". Identified Parameter: "
+                                        + matchingParameter + ".",
+                                new DataClumpRefactoring(currentFunction, otherFunction, new ArrayList<>(matchingParameter)));
+                    }
             }
         }
     }
