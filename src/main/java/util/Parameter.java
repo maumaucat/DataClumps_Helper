@@ -1,7 +1,6 @@
 package util;
 import com.intellij.lang.javascript.psi.JSType;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
-import org.jetbrains.annotations.Nullable;
 
 public class Parameter extends Property{
 
@@ -12,7 +11,6 @@ public class Parameter extends Property{
     public Parameter(String name, JSType type) {
         super(name, type);
     }
-
 
     @Override
     public String toString() {

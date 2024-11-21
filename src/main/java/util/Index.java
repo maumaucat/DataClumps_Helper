@@ -35,6 +35,8 @@ public class Index {
 
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
 
+    private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
+
     public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
     }
@@ -45,6 +47,10 @@ public class Index {
 
     public static HashMap<TypeScriptClass, List<ClassField>> getClassesToClassFields() {
         return classesToClassFields;
+    }
+
+    public static HashMap<String, TypeScriptClass> getQualifiedNamesToClasses() {
+        return qualifiedNamesToClasses;
     }
 
     public static HashMap<TypeScriptFunction, List<Parameter>> getFunctionsToParameters() {
@@ -110,6 +116,7 @@ public class Index {
 
     public static void addClass(TypeScriptClass psiClass) {
 
+        qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         classesToClassFields.put(psiClass, new ArrayList<>());
         List<ClassField> classFields = getFields(psiClass);
 
@@ -158,7 +165,7 @@ public class Index {
     }
 
     public static void updateClass(TypeScriptClass psiClass) {
-
+        qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         // wenn die Klasse neu ist -> hinzufügen
         if (!classesToClassFields.containsKey(psiClass)) {
             addClass(psiClass);
@@ -217,6 +224,7 @@ public class Index {
         propertiesToClasses = new HashMap<>();
         classesToClassFields = new HashMap<>();
         functionsToParameters = new HashMap<>();
+        qualifiedNamesToClasses = new HashMap<>();
 
         // Read operations need this
         ApplicationManager.getApplication().runReadAction(() -> {

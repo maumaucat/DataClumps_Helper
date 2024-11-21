@@ -16,6 +16,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import util.Parameter;
+import util.Property;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,9 +40,9 @@ public class DataClumpDetection extends LocalInspectionTool {
             public void visitJSParameterList(@NotNull JSParameterList parameterList) {
                 TypeScriptFunction psiFunction = PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class);
                 if (psiFunction.isConstructor()) {
-                    TypeScriptClass psiClass = PsiTreeUtil.getParentOfType(psiFunction, TypeScriptClass.class);
+                    /*TypeScriptClass psiClass = PsiTreeUtil.getParentOfType(psiFunction, TypeScriptClass.class);
                     Index.updateClass(psiClass);
-                    detectDataClumpForField(psiClass, holder);
+                    detectDataClumpForField(psiClass, holder);*/ // dachte brauch ich aber scheinbar doch nicht und mit doppelte regestrierung *-*
                 }
                 else {
                     Index.updateFunction(psiFunction);
@@ -102,18 +103,21 @@ public class DataClumpDetection extends LocalInspectionTool {
         }
 
         HashMap<ClassField,PsiElement> currentFields = Index.getFieldsToElement(currentClass);
+        LOG.info("Looking for dataclumps of " + currentClass);
 
         for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
             List<ClassField> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
+                LOG.info("DataClump with " + otherClass.getName());
                 for (Map.Entry<ClassField,PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())){
+
+                        LOG.info("Registering problem for element: " + entry.getValue().getText());
                         holder.registerProblem(entry.getValue(), "Data Clump with Class " + otherClass.getName() +
                                 ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherClass, new ArrayList<>(matchingFields)));
                     }
                 }
             }
-
         }
 
         for (TypeScriptFunction otherFunction : potentialFieldParameterDataClumps.keySet()) {
@@ -129,7 +133,6 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
     }
-
 
 
     public static void detectDataClumpForFunction(TypeScriptFunction currentFunction, ProblemsHolder holder) {
@@ -195,4 +198,34 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
     }
+
+    public static List<TypeScriptClass> getClassesThatHaveAll(List<Property> properties) {
+        LOG.info("Properties that shall match: " + properties.toString());
+        List<TypeScriptClass> classes = new ArrayList<>();
+
+        for (Property property : properties) {
+            if (Index.getPropertiesToClasses().get(property) == null) continue;
+            for (TypeScriptClass psiClass : Index.getPropertiesToClasses().get(property)) {
+                if (!psiClass.isValid() || classes.contains(psiClass)) continue;
+                LOG.info("Class to check:" + psiClass.getName());
+                if (hasAll(psiClass, properties)) classes.add(psiClass);
+            }
+        }
+        return classes;
+    }
+
+    // classfields must match
+    public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
+        List<ClassField> classProperties = Index.getClassesToClassFields().get(psiClass);
+        for (Property property : properties) {
+            LOG.info("Checking if class has "+ property.getName());
+            if (!classProperties.contains(property)) return false;
+            LOG.info("contained");
+            if (property instanceof ClassField && !classProperties.get(classProperties.indexOf(property)).matches((ClassField) property)) return false;
+            LOG.info("matches");
+        }
+        return true;
+    }
+
+
 }

@@ -1,4 +1,3 @@
-
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
@@ -14,6 +13,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
+import util.Index;
 import util.Property;
 import javax.swing.*;
 import java.awt.*;
@@ -28,10 +28,12 @@ public class DataClumpDialog extends DialogWrapper {
 
     private static final Logger LOG = Logger.getInstance(DataClumpDialog.class);
 
-
     private List<Property> matching;
     private JRadioButton newClassButton;
+    private JRadioButton existingClassButton;
     private JTextField newClassNameField;
+    private JLabel newClassLabel;
+    private JLabel existingClassLabel;
     private ComboBox existingComboBox;
     private HashMap<Property, JCheckBox> propertySelections = new HashMap<>();
     private TextFieldWithBrowseButton directoryBrowseButton;
@@ -55,19 +57,28 @@ public class DataClumpDialog extends DialogWrapper {
     @Nullable
     @Override
     protected JComponent createCenterPanel() {
-
-        // Hauptpanel mit GridBagLayout
         JPanel dialogPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = JBUI.insets(5); // Abstände zwischen den Elementen
+        gbc.insets = JBUI.insets(5); // abstände
 
-        // Radiobuttons für Auswahlmodus
+        addRadioButtons(dialogPanel, gbc);
+        addNewClassInput(dialogPanel, gbc);
+        addDirectoryBrowser(dialogPanel, gbc);
+        addCheckBoxPanel(dialogPanel, gbc);
+        addExistingClassSelector(dialogPanel, gbc);
+
+        configureRadioButtonActions(dialogPanel, gbc);
+
+        return dialogPanel;
+    }
+    private void addRadioButtons(JPanel panel, GridBagConstraints gbc) {
         JRadioButton newClassRadioButton = new JRadioButton("Create new Class");
         JRadioButton existingClassRadioButton = new JRadioButton("Use existing Class");
         ButtonGroup buttonGroup = new ButtonGroup();
         buttonGroup.add(newClassRadioButton);
         buttonGroup.add(existingClassRadioButton);
         this.newClassButton = newClassRadioButton;
+        this.existingClassButton = existingClassRadioButton;
 
         // Standardmäßig "Enter new class name" ausgewählt
         newClassRadioButton.setSelected(true);
@@ -77,31 +88,25 @@ public class DataClumpDialog extends DialogWrapper {
         gbc.gridy = 0;
         gbc.gridwidth = 1;
         gbc.anchor = GridBagConstraints.WEST;
-        dialogPanel.add(newClassRadioButton, gbc);
+        panel.add(newClassRadioButton, gbc);
         gbc.gridx = 1;
-        dialogPanel.add(existingClassRadioButton, gbc);
+        panel.add(existingClassRadioButton, gbc);
+    }
 
-
-        // Panel für Klassennamen-Eingabe
-        JLabel newClassLabel = new JLabel("Enter Class Name:");
+    private void addNewClassInput(JPanel panel, GridBagConstraints gbc) {
+        this.newClassLabel = new JLabel("Enter Class Name:");
         JTextField newClassField = new JTextField(20);
         this.newClassNameField = newClassField;
 
-        // Panel für bestehende Klassen-Auswahl
-        JLabel existingClassLabel = new JLabel("Existing class:");
-        ComboBox<String> existingComboBox = new ComboBox<>(new String[]{"Class 1", "Class 2", "Class 3"});
-        this.existingComboBox = existingComboBox;
-
-        // Layout für Klassen-Eingabe / Auswahl
         gbc.gridwidth = 1;
         gbc.gridy = 2;
         gbc.gridx = 0;
-        dialogPanel.add(newClassLabel, gbc);
+        panel.add(newClassLabel, gbc);
         gbc.gridx = 1;
-        dialogPanel.add(newClassField, gbc);
+        panel.add(newClassField, gbc);
+    }
 
-
-        // File Browser für Directory
+    private void addDirectoryBrowser(JPanel panel, GridBagConstraints gbc) {
         TextFieldWithBrowseButton directoryBrowseButton = new TextFieldWithBrowseButton();
         FileChooserDescriptor descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
         descriptor.setRoots(project.getBaseDir());
@@ -113,75 +118,98 @@ public class DataClumpDialog extends DialogWrapper {
                 descriptor
         );
 
-        // Standartauswahl ist das directory, indem auch die klasse/ Funktion liegt von der das ganze ausgeführt wird
+        // Standardauswahl ist das aktuelle Verzeichnis
         directoryBrowseButton.setText(current.getContainingFile().getContainingDirectory().getVirtualFile().getPath());
         this.directoryBrowseButton = directoryBrowseButton;
 
-        // Layout für Browser
         gbc.gridx = 2;
-        dialogPanel.add(directoryBrowseButton, gbc);
+        panel.add(directoryBrowseButton, gbc);
+    }
 
-        // Checkboxen für Parameter / Klassenfelder
+    private void addCheckBoxPanel(JPanel panel, GridBagConstraints gbc) {
         JLabel checkBoxLabel = new JLabel("Choose which parameters or fields should be extracted into the new class:");
         JPanel checkBoxPanel = new JPanel(new FlowLayout());
         for (Property property : matching) {
             JCheckBox checkBox = new JCheckBox(property.getName() + ":" + property.getType());
             checkBox.setSelected(true);
+            checkBox.addActionListener(e -> {
+                if (existingClassButton.isSelected()) {
+                    setClassSelection(DataClumpDetection.getClassesThatHaveAll(getProperties()));
+                }
+            });
             checkBoxPanel.add(checkBox);
             this.propertySelections.put(property, checkBox);
         }
         this.checkBoxPanel = checkBoxPanel;
 
-        // Layout für Label
+        // Layout für Checkbox-Panel
         gbc.gridx = 0;
         gbc.gridy = 3;
         gbc.gridwidth = 3;
         gbc.anchor = GridBagConstraints.WEST;
-        dialogPanel.add(checkBoxLabel, gbc);
-        // Layout für Checkboxen
-        gbc.gridy = 4;
-        dialogPanel.add(checkBoxPanel, gbc);
+        panel.add(checkBoxLabel, gbc);
 
-        // ActionListener für Radiobuttons, um Sichtbarkeit zu steuern
-        newClassRadioButton.addActionListener(e -> {
-            dialogPanel.remove(existingComboBox);
-            dialogPanel.remove(existingClassLabel);
-            // Layout
+        gbc.gridy = 4;
+        panel.add(checkBoxPanel, gbc);
+    }
+
+    private void addExistingClassSelector(JPanel panel, GridBagConstraints gbc) {
+        ComboBox<String> existingComboBox = new ComboBox<>();
+        this.existingClassLabel = new JLabel("Existing class:");
+        this.existingComboBox = existingComboBox;
+
+        setClassSelection(DataClumpDetection.getClassesThatHaveAll(getProperties()));
+    }
+
+    private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {
+        this.newClassButton.addActionListener(e -> {
+            panel.remove(existingComboBox);
+            panel.remove(existingClassLabel);
+
             gbc.gridwidth = 1;
             gbc.gridx = 0;
             gbc.gridy = 2;
-            dialogPanel.add(newClassLabel, gbc);
+            panel.add(newClassLabel, gbc);
             gbc.gridx = 1;
-            dialogPanel.add(newClassField, gbc);
+            panel.add(newClassNameField, gbc);
             gbc.gridx = 2;
-            dialogPanel.add(directoryBrowseButton, gbc);
-            dialogPanel.revalidate();
-            dialogPanel.repaint();
+            panel.add(directoryBrowseButton, gbc);
+            panel.revalidate();
+            panel.repaint();
         });
 
-        existingClassRadioButton.addActionListener(e -> {
-            dialogPanel.remove(newClassLabel);
-            dialogPanel.remove(newClassField);
-            dialogPanel.remove(directoryBrowseButton);
-            // Layout
+        this.existingClassButton.addActionListener(e -> {
+            panel.remove(newClassLabel);
+            panel.remove(newClassNameField);
+            panel.remove(directoryBrowseButton);
+
             gbc.gridwidth = 1;
             gbc.gridx = 0;
             gbc.gridy = 2;
-            dialogPanel.add(existingClassLabel, gbc);
+            panel.add(existingClassLabel, gbc);
             gbc.gridwidth = 2;
             gbc.gridx = 1;
-            dialogPanel.add(existingComboBox, gbc);
-            dialogPanel.revalidate();
-            dialogPanel.repaint();
+            panel.add(existingComboBox, gbc);
+            panel.revalidate();
+            panel.repaint();
         });
+    }
 
-        return dialogPanel;
+    private void setClassSelection(List<TypeScriptClass> classes) {
+        existingComboBox.removeAllItems();
+
+        for (TypeScriptClass tsClass : classes) {
+            existingComboBox.addItem(tsClass.getQualifiedName());
+        }
+
+        existingComboBox.revalidate();
+        existingComboBox.repaint();
     }
 
     @Override
     protected @Nullable ValidationInfo doValidate() {
 
-        if (this.newClassButton.isSelected()) {
+        if (shouldCreateNewClass()) {
             // check if directory is valid
             PsiDirectory directory = getDirectory();
             if ( directory == null ) {
@@ -209,14 +237,17 @@ public class DataClumpDialog extends DialogWrapper {
                     }
                 }
             }
+        } else {
+            TypeScriptClass selectedClass = getSelectedClass();
+            if (selectedClass == null) {
+                return new ValidationInfo("There exists no matching class", this.existingClassButton);
+            }
         }
-
         // check that enough properties are selected
         List<Property> selectedProperties = this.getProperties();
         if (selectedProperties.size() <= 1) {
             return new ValidationInfo("Not enough parameter or fields selected", (JComponent) this.checkBoxPanel.getComponents()[0]);
         }
-
         return super.doValidate();
     }
 
@@ -246,5 +277,15 @@ public class DataClumpDialog extends DialogWrapper {
         }
 
         return selectedProperties;
+    }
+
+    public TypeScriptClass getSelectedClass() {
+        if (this.existingComboBox.getComponents() == null) return null;
+        String qualifiedName = (String) this.existingComboBox.getSelectedItem();
+        return Index.getQualifiedNamesToClasses().get(qualifiedName);
+    }
+
+    public boolean shouldCreateNewClass() {
+        return this.newClassButton.isSelected();
     }
 }
