@@ -21,7 +21,6 @@ import java.util.Map;
 
 public class DataClumpDetection extends LocalInspectionTool {
 
-    // this cp
     static final int MIN_DATACLUMPS = 2;
 
     @Override
@@ -118,7 +117,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     public static void detectDataClumpForFunction(TypeScriptFunction currentFunction, ProblemsHolder holder) {
         if (currentFunction.isConstructor()) return;
-        HashMap<TypeScriptClass, List<Parameter>> potentialParameterFieldDataClumps = new HashMap<>();
+        HashMap<TypeScriptClass, List<ClassField>> potentialParameterFieldDataClumps = new HashMap<>();
         HashMap<TypeScriptFunction, List<Parameter>> potentialParameterParameterDataClumps = new HashMap<>();
 
         // all Properties/Parameter the class has
@@ -145,13 +144,15 @@ public class DataClumpDetection extends LocalInspectionTool {
                 if (!potentialParameterFieldDataClumps.containsKey(otherClass)) {
                     potentialParameterFieldDataClumps.put(otherClass, new ArrayList<>());
                 }
-                potentialParameterFieldDataClumps.get(otherClass).add(parameter);
+
+                ClassField classfield = Index.getMatchingClassFieldForClass(otherClass, parameter);
+                potentialParameterFieldDataClumps.get(otherClass).add(classfield);
 
             }
         }
 
         for (TypeScriptClass otherClass : potentialParameterFieldDataClumps.keySet()) {
-            List<Parameter> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
+            List<ClassField> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
             if (matchingParameter.size() >= MIN_DATACLUMPS) {
                 for (JSParameterListElement psiParameter : currentFunction.getParameters())
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
@@ -178,7 +179,5 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
     }
-
-    // write fibbonachi
 
 }

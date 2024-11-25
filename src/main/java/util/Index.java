@@ -66,6 +66,15 @@ public class Index {
         return parameters;
     }
 
+    public static ClassField getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) {
+        List<ClassField> classFields = classesToClassFields.get(psiClass);
+        for (ClassField classField : classFields) {
+            if (classField.equals(property)) return classField;
+        }
+        CodeSmellLogger.error("No matching ClassField found for " + property + " in " + psiClass, new IllegalArgumentException());
+        return null;
+    }
+
     public static void addClass(TypeScriptClass psiClass) {
 
         qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
