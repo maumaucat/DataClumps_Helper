@@ -14,6 +14,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.searches.ReferencesSearch;
+import com.intellij.psi.util.PsiClassUtil;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import util.*;
@@ -22,7 +23,6 @@ import java.util.*;
 
 public class DataClumpRefactoring implements LocalQuickFix {
 
-    private static final Logger LOG = Logger.getInstance(DataClumpRefactoring.class);
 
     private final List<Property> matchingProperties;
     private final PsiElement currentElement;
@@ -47,16 +47,27 @@ public class DataClumpRefactoring implements LocalQuickFix {
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
 
-        DataClumpDialog dialog = new DataClumpDialog(matchingProperties, currentElement, otherElement);
+        DataClumpDialog dialog = new DataClumpDialog(matchingProperties, currentElement);
 
         if (!dialog.showAndGet()) return;
 
-        String className = dialog.getClassName();
-        List<Property> selectedProperties = dialog.getProperties();
-        PsiDirectory targetDirectory = dialog.getDirectory();
+        CodeSmellLogger.info("Refactoring DataClump between " + currentElement + " and " + otherElement);
 
-        // Erstellen der neuen Klasse
-        TypeScriptClass extractedClass = extractClass(targetDirectory, className, selectedProperties);
+        List<Property> selectedProperties = dialog.getProperties();
+        TypeScriptClass extractedClass;
+
+        if (dialog.shouldCreateNewClass()) {
+            String className = dialog.getClassName();
+            PsiDirectory targetDirectory = dialog.getDirectory();
+
+            CodeSmellLogger.info("Creating new class with name " + className + " in " + targetDirectory);
+            // Erstellen der neuen Klasse
+            extractedClass = extractClass(targetDirectory, className, selectedProperties);
+        } else {
+            extractedClass = dialog.getSelectedClass();
+            CodeSmellLogger.info("Using existing class " + extractedClass.getQualifiedName());
+        }
+
 
         // Refaktorieren der beteiligten Elemente
         refactorElement(currentElement, extractedClass, selectedProperties);
@@ -72,6 +83,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
     }
 
     private void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties) {
+        CodeSmellLogger.info("Refactoring class " + psiClass.getQualifiedName() + "...");
+
         String fieldName = extractedClass.getName().toLowerCase();
 
         // Neues Feld hinzufügen
@@ -83,6 +96,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         // Konstruktor aktualisieren
         updateConstructor(psiClass, properties, extractedClass, fieldName);
 
+        CodeSmellLogger.info("Class refactord.");
     }
 
     private void addNewFieldToClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, String fieldName) {
@@ -121,7 +135,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
 
-        HashMap<ClassField,PsiElement> fieldsToElement = Index.getFieldsToElement(psiClass);
+        HashMap<ClassField,PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
 
         for (Map.Entry<ClassField,PsiElement> entry : fieldsToElement.entrySet()) {
             ClassField field = entry.getKey();
@@ -166,12 +180,14 @@ public class DataClumpRefactoring implements LocalQuickFix {
     }
 
     public static void refactorFunction(TypeScriptFunction psiFunction, TypeScriptClass extractedClass, List<Property> properties) {
+        CodeSmellLogger.info("Refactoring function " + psiFunction.getQualifiedName() + "...");
+
         String newParameterName = extractedClass.getQualifiedName();
 
         introduceParameterObject(properties, psiFunction, extractedClass, newParameterName);
 
+        CodeSmellLogger.info("Function refactored.");
     }
-
 
     public static void introduceParameterObject(List<Property> properties, TypeScriptFunction function, TypeScriptClass extractedClass, String newParameterName) {
 
@@ -179,20 +195,21 @@ public class DataClumpRefactoring implements LocalQuickFix {
         List<Property> originalParameters = new ArrayList<>();
 
         // Process the function's current parameters
-        for (JSParameterListElement parameter : function.getParameters()) {
-            Property currentProperty = new Parameter((TypeScriptParameter) parameter);
-            originalParameters.add(currentProperty);
+        for (JSParameterListElement originalParameter : function.getParameters()) {
+            Property originalProperty = new Parameter((TypeScriptParameter) originalParameter);
+            originalParameters.add(originalProperty);
+
 
             // Replace references to selected parameters with getter calls on the new object
-            if (properties.contains(currentProperty)) {
-                for (PsiReference reference : ReferencesSearch.search(parameter)) {
-                    JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + "." + parameter.getName(), function);
+            if (properties.contains(originalProperty)) {
+                for (PsiReference reference : ReferencesSearch.search(originalParameter)) {
+                    JSExpression getter = JSPsiElementFactory.createJSExpression(newParameterName + "." + originalParameter.getName(), function);
                     WriteCommandAction.runWriteCommandAction(project, () -> {
                         reference.getElement().replace(getter);
                     });
                 }
                 // Remove the parameter from the function's signature
-                WriteCommandAction.runWriteCommandAction(project, parameter::delete);
+                WriteCommandAction.runWriteCommandAction(project, originalParameter::delete);
             }
         }
 
@@ -246,9 +263,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
         }
     }
 
-
     public TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields) {
-
+        CodeSmellLogger.info("Extracting class...");
         //TODO Formatter?
         StringBuilder classCode = new StringBuilder();
         classCode.append("class " + className + " {\n\n");
@@ -273,7 +289,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         for (Property field : fields) {
             final String fieldName = field.getName();
             final String fieldType = field.getType().getTypeText();
-            classCode.append("  public get " + fieldName + "(): " + fieldType + " {\n");
+            classCode.append("  get " + fieldName + "(): " + fieldType + " {\n");
             classCode.append("    return this._" + fieldName + ";\n");
             classCode.append("  }\n\n");
 
@@ -297,9 +313,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
             dir.add(psiFile[0]);
         });
 
+        CodeSmellLogger.info("Class extracted.");
         return PsiTreeUtil.getChildOfType(psiFile[0], TypeScriptClass.class);
     }
-
 
     // so dialog (atw) does explode if not there
     @Override

@@ -25,8 +25,6 @@ import java.util.*;
 
 public class Index {
 
-    private static final Logger LOG = Logger.getInstance(Index.class);
-
     private static HashMap<Property,List<TypeScriptFunction>> propertiesToFunctions;
 
     private static HashMap<Property, List<TypeScriptClass>> propertiesToClasses;
@@ -57,52 +55,6 @@ public class Index {
         return functionsToParameters;
     }
 
-    private static List<ClassField> getFields(TypeScriptClass psiClass) {
-        List<ClassField> fields = new ArrayList<>();
-        // iterate all FieldStatements
-        for (JSField field : psiClass.getFields()) {
-            if (field.getName() == null || field.getJSType() == null) continue;
-            fields.add(new ClassField((TypeScriptField) field));
-
-        }
-        // iterate constructor Parameter
-        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-        if (constructor != null) {
-            for (JSParameterListElement psiParameter : constructor.getParameters()) {
-                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-                // test if parameter is actually field
-                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
-                    fields.add(new ClassField((TypeScriptParameter) psiParameter));
-                }
-            }
-        }
-        return fields;
-    }
-
-    //TODO überlegen ob mit getFields aus Index zusammenlegen und wohin die funktion gehöhrt
-    public static HashMap<ClassField, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
-        HashMap<ClassField, PsiElement> fields = new HashMap<>();
-        // iterate all FieldStatements
-        for (JSField field : psiClass.getFields()) {
-            if (field.getName() == null || field.getJSType() == null) continue;
-            fields.put(new ClassField((TypeScriptField) field), field);
-
-        }
-        // iterate constructor Parameter
-        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-        if (constructor != null) {
-            for (JSParameterListElement psiParameter : constructor.getParameters()) {
-                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-                // test if parameter is actually field
-                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
-                    fields.put(new ClassField((TypeScriptParameter) psiParameter), psiParameter);
-                }
-            }
-        }
-        return fields;
-
-    }
-
     private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
         List<Parameter> parameters = new ArrayList<>();
         for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
@@ -118,7 +70,7 @@ public class Index {
 
         qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         classesToClassFields.put(psiClass, new ArrayList<>());
-        List<ClassField> classFields = getFields(psiClass);
+        List<ClassField> classFields = PsiUtil.getFields(psiClass);
 
         for (ClassField classField : classFields) {
             classesToClassFields.get(psiClass).add(classField);
@@ -173,7 +125,7 @@ public class Index {
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
-        List<ClassField> new_Fields = getFields(psiClass);
+        List<ClassField> new_Fields = PsiUtil.getFields(psiClass);
 
         // alle alten KlassenFelder
         List<ClassField> toBeRemoved = new ArrayList<>(classesToClassFields.get(psiClass));
@@ -226,6 +178,8 @@ public class Index {
         functionsToParameters = new HashMap<>();
         qualifiedNamesToClasses = new HashMap<>();
 
+        CodeSmellLogger.info("Building index...");
+
         // Read operations need this
         ApplicationManager.getApplication().runReadAction(() -> {
 
@@ -248,15 +202,18 @@ public class Index {
             }
         });
 
+        CodeSmellLogger.info("Index was build.");
+
         printClassFieldsToClasses();
         printParametersToFunctions();
         printClassesToClassFields();
         printFunctionsToParameter();
+
     }
 
     public static void printClassFieldsToClasses() {
         ApplicationManager.getApplication().runReadAction(() -> {
-        LOG.info("ClassField to classes");
+        CodeSmellLogger.info("ClassesFields to Classes: ");
         for (Property classField : propertiesToClasses.keySet()) {
             List<TypeScriptClass> classList = propertiesToClasses.get(classField);
             StringBuilder classes = new StringBuilder("[");
@@ -264,14 +221,13 @@ public class Index {
                 classes.append(typeScriptClass.getName()).append(",");
             }
             classes.append("]");
-            LOG.info(classField.toString() + " " + classes);
-        }
-        LOG.info("ClassField to classes"); });
+            CodeSmellLogger.info(classField + " : " + classes);
+        }});
     }
 
     public static void printParametersToFunctions() {
         ApplicationManager.getApplication().runReadAction(() -> {
-        LOG.info("Parameters to Functions");
+        CodeSmellLogger.info("Parameters to Functions: ");
         for (Property parameter : propertiesToFunctions.keySet()) {
             List<TypeScriptFunction> functions = propertiesToFunctions.get(parameter);
             StringBuilder parameters = new StringBuilder("[");
@@ -279,39 +235,37 @@ public class Index {
                 parameters.append(function.getName()).append(",");
             }
             parameters.append("]");
-            LOG.info(parameter.toString() + " " + parameters);
+            CodeSmellLogger.info(parameter + " " + parameters);
         }
-        LOG.info("Parameters to Functions"); });
+        });
     }
 
     public static void printFunctionsToParameter() {
         ApplicationManager.getApplication().runReadAction(() -> {
-            LOG.info("Functions to Parameter");
+            CodeSmellLogger.info("Functions to Parameter: ");
             for (TypeScriptFunction function : functionsToParameters.keySet()) {
                 StringBuilder parameters = new StringBuilder("[");
                 for (Parameter parameter : functionsToParameters.get(function)) {
                     parameters.append(parameter.toString()).append(",");
                 }
                 parameters.append("]");
-                LOG.info(function.getName() + " " + parameters);
+                CodeSmellLogger.info(function.getName() + " " + parameters);
             }
-            LOG.info("Functions to Parameter");
         });
     }
 
     public static void printClassesToClassFields() {
         ApplicationManager.getApplication().runReadAction(() -> {
-            LOG.info("Classes to ClassFields");
+            CodeSmellLogger.info("Classes to ClassFields: ");
             for (TypeScriptClass clazz : classesToClassFields.keySet()) {
                 StringBuilder classFields = new StringBuilder("[");
                 for (ClassField classField : classesToClassFields.get(clazz)) {
                     classFields.append(classField.toString()).append(",");
                 }
                 classFields.append("]");
-                LOG.info(clazz.getName() + " " + classFields);
+                CodeSmellLogger.info(clazz.getName() + " " + classFields);
             }
         });
-        LOG.info("Classes to ClassFields");
     }
 
 }

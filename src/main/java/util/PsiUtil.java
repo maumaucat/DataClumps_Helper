@@ -1,5 +1,4 @@
 package util;
-
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.*;
@@ -7,18 +6,22 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.psi.util.PsiTreeUtil;
 
-public class PsiUtil {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
-    private static final Logger LOG = Logger.getInstance(PsiUtil.class);
+
+public class PsiUtil {
+    //TODO check for all 5 of them if they are actually necessary or can be replaced by create Statement
 
     public static ES6FieldStatementImpl createJSFieldStatement(JSClass context, String name, JSType type, String visibility) {
         String fieldText = visibility + " " + name + " : " + type.getTypeText() + ";";
@@ -81,6 +84,74 @@ public class PsiUtil {
         TypeScriptFunction psiFunction = PsiTreeUtil.getChildOfType(psiFile, TypeScriptFunction.class);
 
         return psiFunction.getParameterList();
+    }
+
+    public static List<TypeScriptClass> getClassesThatHaveAll(List<Property> properties) {
+        List<TypeScriptClass> classes = new ArrayList<>();
+
+        for (Property property : properties) {
+            if (Index.getPropertiesToClasses().get(property) == null) continue;
+            for (TypeScriptClass psiClass : Index.getPropertiesToClasses().get(property)) {
+                if (!psiClass.isValid() || classes.contains(psiClass)) continue;
+                if (hasAll(psiClass, properties)) classes.add(psiClass);
+            }
+        }
+        return classes;
+    }
+
+    // classfields must match
+    public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
+        List<ClassField> classProperties = Index.getClassesToClassFields().get(psiClass);
+        for (Property property : properties) {
+            if (!classProperties.contains(property)) return false;
+            if (property instanceof ClassField && !classProperties.get(classProperties.indexOf(property)).matches((ClassField) property)) return false;
+        }
+        return true;
+    }
+
+    public static List<ClassField> getFields(TypeScriptClass psiClass) {
+        List<ClassField> fields = new ArrayList<>();
+        // iterate all FieldStatements
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.add(new ClassField((TypeScriptField) field));
+
+        }
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                // test if parameter is actually field
+                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
+                    fields.add(new ClassField((TypeScriptParameter) psiParameter));
+                }
+            }
+        }
+        return fields;
+    }
+
+    public static HashMap<ClassField, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
+        HashMap<ClassField, PsiElement> fields = new HashMap<>();
+        // iterate all FieldStatements
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.put(new ClassField((TypeScriptField) field), field);
+
+        }
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                // test if parameter is actually field
+                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
+                    fields.put(new ClassField((TypeScriptParameter) psiParameter), psiParameter);
+                }
+            }
+        }
+        return fields;
+
     }
 
 }

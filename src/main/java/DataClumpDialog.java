@@ -15,6 +15,8 @@ import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
 import util.Index;
 import util.Property;
+import util.PsiUtil;
+
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
@@ -25,8 +27,6 @@ import static com.intellij.codeInsight.intention.preview.IntentionPreviewUtils.g
 
 
 public class DataClumpDialog extends DialogWrapper {
-
-    private static final Logger LOG = Logger.getInstance(DataClumpDialog.class);
 
     private List<Property> matching;
     private JRadioButton newClassButton;
@@ -41,15 +41,13 @@ public class DataClumpDialog extends DialogWrapper {
 
     private Project project;
     private PsiElement current;
-    private PsiElement other;
 
 
-    public DataClumpDialog(List<Property> matching, PsiElement current, PsiElement other) {
+    public DataClumpDialog(List<Property> matching, PsiElement current) {
         super(true);
         this.project = current.getProject();
         this.matching = matching;
         this.current = current;
-        this.other = other;
         setTitle("Data Clump Refactoring");
         init();
     }
@@ -134,7 +132,7 @@ public class DataClumpDialog extends DialogWrapper {
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
                 if (existingClassButton.isSelected()) {
-                    setClassSelection(DataClumpDetection.getClassesThatHaveAll(getProperties()));
+                    setClassSelection(PsiUtil.getClassesThatHaveAll(getProperties()));
                 }
             });
             checkBoxPanel.add(checkBox);
@@ -158,7 +156,7 @@ public class DataClumpDialog extends DialogWrapper {
         this.existingClassLabel = new JLabel("Existing class:");
         this.existingComboBox = existingComboBox;
 
-        setClassSelection(DataClumpDetection.getClassesThatHaveAll(getProperties()));
+        setClassSelection(PsiUtil.getClassesThatHaveAll(getProperties()));
     }
 
     private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {
