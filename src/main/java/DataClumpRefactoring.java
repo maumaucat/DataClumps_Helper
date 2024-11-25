@@ -10,11 +10,9 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.searches.ReferencesSearch;
-import com.intellij.psi.util.PsiClassUtil;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import util.*;
@@ -135,10 +133,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
 
-        HashMap<ClassField,PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
+        HashMap<Classfield,PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
 
-        for (Map.Entry<ClassField,PsiElement> entry : fieldsToElement.entrySet()) {
-            ClassField field = entry.getKey();
+        for (Map.Entry<Classfield,PsiElement> entry : fieldsToElement.entrySet()) {
+            Classfield field = entry.getKey();
             PsiElement element = entry.getValue();
 
             if (properties.contains(field)) {
@@ -161,7 +159,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         }
     }
 
-    private void replaceAssignmentWithSetter(JSAssignmentExpression assignment, String fieldName, ClassField field) {
+    private void replaceAssignmentWithSetter(JSAssignmentExpression assignment, String fieldName, Classfield field) {
         JSExpression newExpression = JSPsiElementFactory.createJSExpression(
                 "this." + fieldName + "." + field.getName() + " = " + assignment.getROperand().getText(), assignment
         );
@@ -170,7 +168,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         });
     }
 
-    private void replaceReferenceWithGetter(PsiReference reference, String fieldName, ClassField field) {
+    private void replaceReferenceWithGetter(PsiReference reference, String fieldName, Classfield field) {
         JSExpression newExpression = JSPsiElementFactory.createJSExpression(
                 "this." + fieldName + "." + field.getName(), reference.getElement()
         );

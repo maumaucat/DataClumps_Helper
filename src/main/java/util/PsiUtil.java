@@ -9,7 +9,6 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
@@ -86,6 +85,41 @@ public class PsiUtil {
         return psiFunction.getParameterList();
     }
 
+    public static List<String> getModifiers(TypeScriptField field) {
+        CodeSmellLogger.info("Getting Modifiers for Field " + field.getName());
+        List<String> modifiers = new ArrayList<>();
+        modifiers.add(field.getAccessType().toString());
+
+        JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
+        modifiers.addAll(getModifiers(attributeList));
+        CodeSmellLogger.info("Modifiers for Field " + field.getName() + ": " + modifiers);
+        return  modifiers;
+    }
+
+    public static List<String> getModifiers(TypeScriptParameter parameter) {
+        CodeSmellLogger.info("Getting Modifiers for Parameter " + parameter.getName());
+        List<String> modifiers = new ArrayList<>();
+        modifiers.add(parameter.getAccessType().toString());
+
+        JSAttributeList attributeList = PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class);
+        modifiers.addAll(getModifiers(attributeList));
+        CodeSmellLogger.info("Modifiers for Parameter " + parameter.getName() + ": " + modifiers);
+        return  modifiers;
+    }
+
+    private static List<String> getModifiers(JSAttributeList attributeList) {
+
+        List<String> modifiers = new ArrayList<>();
+
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.READONLY)) modifiers.add("readonly");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.STATIC)) modifiers.add("static");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.ABSTRACT)) modifiers.add("abstract");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.DECLARE)) modifiers.add("declare");
+
+
+        return modifiers;
+    }
+
     public static List<TypeScriptClass> getClassesThatHaveAll(List<Property> properties) {
         List<TypeScriptClass> classes = new ArrayList<>();
 
@@ -101,20 +135,20 @@ public class PsiUtil {
 
     // classfields must match
     public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
-        List<ClassField> classProperties = Index.getClassesToClassFields().get(psiClass);
+        List<Classfield> classProperties = Index.getClassesToClassFields().get(psiClass);
         for (Property property : properties) {
             if (!classProperties.contains(property)) return false;
-            if (property instanceof ClassField && !classProperties.get(classProperties.indexOf(property)).matches((ClassField) property)) return false;
+            if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property)) return false;
         }
         return true;
     }
 
-    public static List<ClassField> getFields(TypeScriptClass psiClass) {
-        List<ClassField> fields = new ArrayList<>();
+    public static List<Classfield> getFields(TypeScriptClass psiClass) {
+        List<Classfield> fields = new ArrayList<>();
         // iterate all FieldStatements
         for (JSField field : psiClass.getFields()) {
             if (field.getName() == null || field.getJSType() == null) continue;
-            fields.add(new ClassField((TypeScriptField) field));
+            fields.add(new Classfield((TypeScriptField) field));
 
         }
         // iterate constructor Parameter
@@ -124,19 +158,19 @@ public class PsiUtil {
                 if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
                 // test if parameter is actually field
                 if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
-                    fields.add(new ClassField((TypeScriptParameter) psiParameter));
+                    fields.add(new Classfield((TypeScriptParameter) psiParameter));
                 }
             }
         }
         return fields;
     }
 
-    public static HashMap<ClassField, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
-        HashMap<ClassField, PsiElement> fields = new HashMap<>();
+    public static HashMap<Classfield, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
+        HashMap<Classfield, PsiElement> fields = new HashMap<>();
         // iterate all FieldStatements
         for (JSField field : psiClass.getFields()) {
             if (field.getName() == null || field.getJSType() == null) continue;
-            fields.put(new ClassField((TypeScriptField) field), field);
+            fields.put(new Classfield((TypeScriptField) field), field);
 
         }
         // iterate constructor Parameter
@@ -146,7 +180,7 @@ public class PsiUtil {
                 if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
                 // test if parameter is actually field
                 if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
-                    fields.put(new ClassField((TypeScriptParameter) psiParameter), psiParameter);
+                    fields.put(new Classfield((TypeScriptParameter) psiParameter), psiParameter);
                 }
             }
         }

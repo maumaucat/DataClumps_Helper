@@ -1,20 +1,13 @@
 package util;
 
 import com.intellij.lang.javascript.TypeScriptFileType;
-import com.intellij.lang.javascript.psi.JSArgumentList;
-import com.intellij.lang.javascript.psi.JSField;
-import com.intellij.lang.javascript.psi.JSParameter;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
-import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.FileTypeIndex;
@@ -29,7 +22,7 @@ public class Index {
 
     private static HashMap<Property, List<TypeScriptClass>> propertiesToClasses;
 
-    private static HashMap<TypeScriptClass, List<ClassField>> classesToClassFields;
+    private static HashMap<TypeScriptClass, List<Classfield>> classesToClassFields;
 
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
 
@@ -43,7 +36,7 @@ public class Index {
         return propertiesToClasses;
     }
 
-    public static HashMap<TypeScriptClass, List<ClassField>> getClassesToClassFields() {
+    public static HashMap<TypeScriptClass, List<Classfield>> getClassesToClassFields() {
         return classesToClassFields;
     }
 
@@ -66,9 +59,9 @@ public class Index {
         return parameters;
     }
 
-    public static ClassField getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) {
-        List<ClassField> classFields = classesToClassFields.get(psiClass);
-        for (ClassField classField : classFields) {
+    public static Classfield getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) {
+        List<Classfield> classfields = classesToClassFields.get(psiClass);
+        for (Classfield classField : classfields) {
             if (classField.equals(property)) return classField;
         }
         CodeSmellLogger.error("No matching ClassField found for " + property + " in " + psiClass, new IllegalArgumentException());
@@ -79,9 +72,9 @@ public class Index {
 
         qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         classesToClassFields.put(psiClass, new ArrayList<>());
-        List<ClassField> classFields = PsiUtil.getFields(psiClass);
+        List<Classfield> classfields = PsiUtil.getFields(psiClass);
 
-        for (ClassField classField : classFields) {
+        for (Classfield classField : classfields) {
             classesToClassFields.get(psiClass).add(classField);
             addClassFieldForClass(psiClass, classField);
         }
@@ -134,21 +127,21 @@ public class Index {
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
-        List<ClassField> new_Fields = PsiUtil.getFields(psiClass);
+        List<Classfield> new_Fields = PsiUtil.getFields(psiClass);
 
         // alle alten KlassenFelder
-        List<ClassField> toBeRemoved = new ArrayList<>(classesToClassFields.get(psiClass));
+        List<Classfield> toBeRemoved = new ArrayList<>(classesToClassFields.get(psiClass));
         // alle alten Klassenfelder ohne die, die auch im neuen sind
         toBeRemoved.removeAll(new_Fields);
 
         // eintrag in classes to classFields austauschen
         classesToClassFields.put(psiClass, new_Fields);
 
-        for (ClassField classField : toBeRemoved) {
+        for (Classfield classField : toBeRemoved) {
             propertiesToClasses.get(classField).remove(psiClass);
         }
 
-        for (ClassField classField: new_Fields) {
+        for (Classfield classField: new_Fields) {
             addClassFieldForClass(psiClass, classField);
         }
     }
@@ -166,7 +159,7 @@ public class Index {
 
     }
 
-    public static void addClassFieldForClass(TypeScriptClass psiClass, ClassField classField) {
+    public static void addClassFieldForClass(TypeScriptClass psiClass, Classfield classField) {
         // wenn schon da add to list
         if (propertiesToClasses.containsKey(classField)) {
             // wenn bereits eingetragen nothing to do
@@ -268,7 +261,7 @@ public class Index {
             CodeSmellLogger.info("Classes to ClassFields: ");
             for (TypeScriptClass clazz : classesToClassFields.keySet()) {
                 StringBuilder classFields = new StringBuilder("[");
-                for (ClassField classField : classesToClassFields.get(clazz)) {
+                for (Classfield classField : classesToClassFields.get(clazz)) {
                     classFields.append(classField.toString()).append(",");
                 }
                 classFields.append("]");

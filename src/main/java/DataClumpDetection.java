@@ -41,7 +41,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass typeScriptClass) {
                 Index.updateClass(typeScriptClass);
-                if (typeScriptClass.getFields().length >= MIN_DATACLUMPS) {
+                if (PsiUtil.getFields(typeScriptClass).size() >= MIN_DATACLUMPS) {
                     detectDataClumpForField(typeScriptClass, holder);
                 }
                 super.visitTypeScriptClass(typeScriptClass);
@@ -49,21 +49,21 @@ public class DataClumpDetection extends LocalInspectionTool {
         };
     }
 
-
     public static void detectDataClumpForField(TypeScriptClass currentClass, ProblemsHolder holder) {
+        CodeSmellLogger.info("Detecting Data Clumps for Class " + currentClass.getName());
 
-        HashMap<TypeScriptClass, List<ClassField>> potentialFieldFieldDataClumps = new HashMap<>();
-        HashMap<TypeScriptFunction, List<ClassField>> potentialFieldParameterDataClumps = new HashMap<>();
+        HashMap<TypeScriptClass, List<Classfield>> potentialFieldFieldDataClumps = new HashMap<>();
+        HashMap<TypeScriptFunction, List<Classfield>> potentialFieldParameterDataClumps = new HashMap<>();
 
         // all Properties/Classfields the class has
-        for (ClassField classfield : Index.getClassesToClassFields().get(currentClass)) {
+        for (Classfield classfield : Index.getClassesToClassFields().get(currentClass)) {
             // alle Klassen die eine passende Property haben
             for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(classfield)) {
                 if (otherClass == currentClass) continue;
                 if(!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
 
-                List<ClassField> classFieldList = Index.getClassesToClassFields().get(otherClass);
-                if (classFieldList.get(classFieldList.indexOf(classfield)).matches(classfield)) {
+                List<Classfield> classfieldList = Index.getClassesToClassFields().get(otherClass);
+                if (classfieldList.get(classfieldList.indexOf(classfield)).matches(classfield)) {
                     // add to Map
                     if (!potentialFieldFieldDataClumps.containsKey(otherClass)) {
                         potentialFieldFieldDataClumps.put(otherClass, new ArrayList<>());
@@ -86,12 +86,15 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
 
-        HashMap<ClassField,PsiElement> currentFields = PsiUtil.getFieldsToElement(currentClass);
+        HashMap<Classfield,PsiElement> currentFields = PsiUtil.getFieldsToElement(currentClass);
 
         for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
-            List<ClassField> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
+            CodeSmellLogger.info("Potential Data Clump with Class " + otherClass.getName());
+            CodeSmellLogger.info("Identified Fields: " + potentialFieldFieldDataClumps.get(otherClass));
+
+            List<Classfield> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
-                for (Map.Entry<ClassField,PsiElement> entry : currentFields.entrySet()) {
+                for (Map.Entry<Classfield,PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())){
                         holder.registerProblem(entry.getValue(), "Data Clump with Class " + otherClass.getName() +
                                 ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherClass, new ArrayList<>(matchingFields)));
@@ -101,9 +104,9 @@ public class DataClumpDetection extends LocalInspectionTool {
         }
 
         for (TypeScriptFunction otherFunction : potentialFieldParameterDataClumps.keySet()) {
-            List<ClassField> matchingFields = potentialFieldParameterDataClumps.get(otherFunction);
+            List<Classfield> matchingFields = potentialFieldParameterDataClumps.get(otherFunction);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
-                for (Map.Entry<ClassField,PsiElement> entry : currentFields.entrySet()) {
+                for (Map.Entry<Classfield,PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())) {
                         holder.registerProblem(entry.getValue(), "Data Clump with Function " + otherFunction.getName() +
                                 ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherFunction, new ArrayList<>(matchingFields)));
@@ -117,7 +120,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     public static void detectDataClumpForFunction(TypeScriptFunction currentFunction, ProblemsHolder holder) {
         if (currentFunction.isConstructor()) return;
-        HashMap<TypeScriptClass, List<ClassField>> potentialParameterFieldDataClumps = new HashMap<>();
+        HashMap<TypeScriptClass, List<Classfield>> potentialParameterFieldDataClumps = new HashMap<>();
         HashMap<TypeScriptFunction, List<Parameter>> potentialParameterParameterDataClumps = new HashMap<>();
 
         // all Properties/Parameter the class has
@@ -145,14 +148,14 @@ public class DataClumpDetection extends LocalInspectionTool {
                     potentialParameterFieldDataClumps.put(otherClass, new ArrayList<>());
                 }
 
-                ClassField classfield = Index.getMatchingClassFieldForClass(otherClass, parameter);
+                Classfield classfield = Index.getMatchingClassFieldForClass(otherClass, parameter);
                 potentialParameterFieldDataClumps.get(otherClass).add(classfield);
 
             }
         }
 
         for (TypeScriptClass otherClass : potentialParameterFieldDataClumps.keySet()) {
-            List<ClassField> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
+            List<Classfield> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
             if (matchingParameter.size() >= MIN_DATACLUMPS) {
                 for (JSParameterListElement psiParameter : currentFunction.getParameters())
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
