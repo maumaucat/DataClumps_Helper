@@ -27,8 +27,8 @@ public class Classfield extends Property {
         return "[ClassField: name=" + this.getName() + ", type=" + this.getType() + ", modifiers=" + this.getModifier() + "]";
     }
 
-    public boolean matches(Classfield field) {
-        return this.getName().equals(field.getName())
+    public boolean matches(Classfield field){
+         return this.getName().equals(field.getName())
                 && this.getType().equals(field.getType())
                 && this.getModifier().equals(field.getModifier());
     }

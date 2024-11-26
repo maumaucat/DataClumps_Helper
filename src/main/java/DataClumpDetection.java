@@ -50,8 +50,6 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
     public static void detectDataClumpForField(TypeScriptClass currentClass, ProblemsHolder holder) {
-        CodeSmellLogger.info("Detecting Data Clumps for Class " + currentClass.getName());
-
         HashMap<TypeScriptClass, List<Classfield>> potentialFieldFieldDataClumps = new HashMap<>();
         HashMap<TypeScriptFunction, List<Classfield>> potentialFieldParameterDataClumps = new HashMap<>();
 
@@ -89,8 +87,6 @@ public class DataClumpDetection extends LocalInspectionTool {
         HashMap<Classfield,PsiElement> currentFields = PsiUtil.getFieldsToElement(currentClass);
 
         for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
-            CodeSmellLogger.info("Potential Data Clump with Class " + otherClass.getName());
-            CodeSmellLogger.info("Identified Fields: " + potentialFieldFieldDataClumps.get(otherClass));
 
             List<Classfield> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
@@ -182,5 +178,4 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
     }
-
 }

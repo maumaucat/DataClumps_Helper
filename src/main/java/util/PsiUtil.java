@@ -86,24 +86,20 @@ public class PsiUtil {
     }
 
     public static List<String> getModifiers(TypeScriptField field) {
-        CodeSmellLogger.info("Getting Modifiers for Field " + field.getName());
         List<String> modifiers = new ArrayList<>();
-        modifiers.add(field.getAccessType().toString());
+        modifiers.add(field.getAccessType().toString().toLowerCase());
 
         JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
         modifiers.addAll(getModifiers(attributeList));
-        CodeSmellLogger.info("Modifiers for Field " + field.getName() + ": " + modifiers);
         return  modifiers;
     }
 
     public static List<String> getModifiers(TypeScriptParameter parameter) {
-        CodeSmellLogger.info("Getting Modifiers for Parameter " + parameter.getName());
         List<String> modifiers = new ArrayList<>();
-        modifiers.add(parameter.getAccessType().toString());
+        modifiers.add(parameter.getAccessType().toString().toLowerCase());
 
         JSAttributeList attributeList = PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class);
         modifiers.addAll(getModifiers(attributeList));
-        CodeSmellLogger.info("Modifiers for Parameter " + parameter.getName() + ": " + modifiers);
         return  modifiers;
     }
 
@@ -111,8 +107,9 @@ public class PsiUtil {
 
         List<String> modifiers = new ArrayList<>();
 
-        if (attributeList.hasModifier(JSAttributeList.ModifierType.READONLY)) modifiers.add("readonly");
+        // the order of the modifiers is important for the code generation
         if (attributeList.hasModifier(JSAttributeList.ModifierType.STATIC)) modifiers.add("static");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.READONLY)) modifiers.add("readonly");
         if (attributeList.hasModifier(JSAttributeList.ModifierType.ABSTRACT)) modifiers.add("abstract");
         if (attributeList.hasModifier(JSAttributeList.ModifierType.DECLARE)) modifiers.add("declare");
 
@@ -157,12 +154,16 @@ public class PsiUtil {
             for (JSParameterListElement psiParameter : constructor.getParameters()) {
                 if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
                 // test if parameter is actually field
-                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
+                if (isParameterField((TypeScriptParameter) psiParameter)) { //TODO NOT VERY ELEGANT
                     fields.add(new Classfield((TypeScriptParameter) psiParameter));
                 }
             }
         }
         return fields;
+    }
+
+    public static boolean isParameterField(TypeScriptParameter parameter) {
+        return PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class).getTextLength() > 0;
     }
 
     public static HashMap<Classfield, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
