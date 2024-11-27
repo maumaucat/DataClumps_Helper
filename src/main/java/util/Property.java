@@ -8,6 +8,12 @@ public abstract class Property {
     private final JSType type;
 
     public Property(String name, JSType type) {
+
+        // remove leading underscore from name since it might be added for private properties but is not relevant for comparison
+        if (name.startsWith("_")) {
+            name = name.substring(1);
+        }
+
         this.name = name;
         this.type = type;
     }

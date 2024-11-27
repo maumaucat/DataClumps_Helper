@@ -18,6 +18,7 @@ public class Classfield extends Property {
         this.modifier = PsiUtil.getModifiers(parameter);
     }
 
+
     public List<String> getModifier() {
         return modifier;
     }

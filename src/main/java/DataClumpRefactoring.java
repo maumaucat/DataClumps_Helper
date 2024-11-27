@@ -21,7 +21,6 @@ import java.util.*;
 
 public class DataClumpRefactoring implements LocalQuickFix {
 
-
     private final List<Property> matchingProperties;
     private final PsiElement currentElement;
     private final PsiElement otherElement;
@@ -52,8 +51,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
         CodeSmellLogger.info("Refactoring DataClump between " + currentElement + " and " + otherElement);
 
         List<Property> selectedProperties = dialog.getProperties();
-        TypeScriptClass extractedClass;
+        CodeSmellLogger.info("Selected Properties: " + selectedProperties);
 
+        TypeScriptClass extractedClass;
         HashMap<Classfield, TypeScriptParameter> currentConstructorParameters = new HashMap<>();
         HashMap<Classfield, TypeScriptParameter> otherConstructorParameters = new HashMap<>();
         HashMap<Classfield, String> currentDefaultValues = new HashMap<>();
@@ -74,6 +74,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             PsiDirectory targetDirectory = dialog.getDirectory();
 
             CodeSmellLogger.info("Creating new class with name " + className + " in " + targetDirectory);
+
 
             // Erstellen der neuen Klasse
             List<Property> optional = getOptionalProperties(selectedProperties, currentConstructorParameters, otherConstructorParameters, currentDefaultValues, otherDefaultValues);
@@ -290,8 +291,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
         });
     }
 
-
-
     private void refactorFunction(TypeScriptFunction psiFunction, TypeScriptClass extractedClass, List<Property> properties) {
         CodeSmellLogger.info("Refactoring function " + psiFunction.getQualifiedName() + "...");
 
@@ -352,35 +351,46 @@ public class DataClumpRefactoring implements LocalQuickFix {
     }
 
     private void refactorFunctionCalls(TypeScriptFunction function, List<Property> originalParameters, TypeScriptClass extractedClass, HashMap<Classfield, TypeScriptParameter> refactorableParameter, HashMap<Classfield, String> defaultValues) {
-
+        CodeSmellLogger.info("Refactoring function calls...");
         List<Property> extractedParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
 
         for (PsiReference functionCall : ReferencesSearch.search(function)) {
-
+            CodeSmellLogger.info("Refactoring function call " + functionCall.getElement().getText());
             JSArgumentList argumentList = PsiTreeUtil.getNextSiblingOfType(functionCall.getElement(), JSArgumentList.class);
             JSExpression[] originalArguments = argumentList.getArguments();
 
             StringBuilder updatedArguments = new StringBuilder("(");
 
             for (JSParameterListElement parameter : function.getParameters()) {
+                CodeSmellLogger.info("Checking parameter " + parameter.getText());
                 if (parameter.getJSType().equals(extractedClass.getJSType())) {
+                    CodeSmellLogger.info("Creating new parameter object for " + parameter.getText());
                     // Replace with a constructor call for the new parameter object
                     updatedArguments.append("new ").append(extractedClass.getName()).append("(");
                     for (Property property : extractedParameters) {
-                        CodeSmellLogger.info(refactorableParameter.toString());
-                        int index = originalParameters.indexOf(property);
-                        if (index != -1) {
+                        CodeSmellLogger.info("Checking property " + property.getName());
+                        if (!function.isConstructor()) {
+                            int index = originalParameters.indexOf(property);
+                            if (index == -1) {
+                                CodeSmellLogger.error("Property " + property.getName() + " not found in original parameters", new IndexOutOfBoundsException());
+                                continue;
+                            }
+                            CodeSmellLogger.info("Found in original Parameters " + property.getName() + " at index " + index);
+                            CodeSmellLogger.info("Argument: " + originalArguments[index].getText());
                             updatedArguments.append(originalArguments[index].getText()).append(", ");
                         } else if (refactorableParameter.containsKey(property)) {
-                            index = originalParameters.indexOf(new Parameter(refactorableParameter.get(property)));
+                            CodeSmellLogger.info("Found refactorable property " + property.getName());
+                            CodeSmellLogger.info("Argument: " + refactorableParameter.get(property).getText());
+                            int index = originalParameters.indexOf(new Parameter(refactorableParameter.get(property)));
                             updatedArguments.append(originalArguments[index].getText()).append(", ");
                         }
                         else if (defaultValues.containsKey(property)) {
+                            CodeSmellLogger.info("Found default value for property " + property.getName());
                             updatedArguments.append(defaultValues.get(property)).append(", ");
                         } else {
+                            CodeSmellLogger.info("Property " + property.getName() + " not found -> using undefined");
                             updatedArguments.append("undefined, ");
                         }
-
                     }
                     // Remove trailing comma
                     if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
@@ -389,6 +399,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     updatedArguments.append(")");
                 } else {
                     // Append remaining original arguments
+                    CodeSmellLogger.info("Appending original argument " + originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) parameter))].getText());
                     updatedArguments.append(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) parameter))].getText());
                 }
                 updatedArguments.append(", ");
@@ -529,7 +540,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
         CodeSmellLogger.info("Class extracted.");
         return PsiTreeUtil.getChildOfType(psiFile[0], TypeScriptClass.class);
     }
-
 
     @Override
     public boolean startInWriteAction() {
