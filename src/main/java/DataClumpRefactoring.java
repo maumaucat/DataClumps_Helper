@@ -492,15 +492,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
             PsiUtil.addFunctionToClass(psiClass, setter);
         }
 
-
-
-
         WriteCommandAction.runWriteCommandAction(dir.getProject(), () -> {
             PsiFile file = PsiFileFactory.getInstance(dir.getProject()).createFileFromText(className + ".ts", "");
             file.add(psiClass);
             dir.add(file);
         });
-
 
         CodeSmellLogger.info("Class extracted.");
         return psiClass;

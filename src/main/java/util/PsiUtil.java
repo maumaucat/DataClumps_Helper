@@ -380,7 +380,10 @@ public class PsiUtil {
 
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             // Add the function to the correct position
-            if (psiClass.getFunctions().length > 0) {
+            if (psiClass.getConstructor() != null) {
+                CodeSmellLogger.info("Class has constructor, inserting after it.");
+                psiClass.addAfter(function, psiClass.getConstructor());
+            } else if (psiClass.getFunctions().length > 0) {
                 CodeSmellLogger.info("Class has functions, inserting before the first one.");
                 psiClass.addBefore(function, psiClass.getFunctions()[0]);
             } else {
