@@ -25,6 +25,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private final PsiElement currentElement;
     private final PsiElement otherElement;
 
+    private HashMap<Classfield, TypeScriptParameter> currentConstructorParameters = new HashMap<>();
+    private HashMap<Classfield, TypeScriptParameter> otherConstructorParameters = new HashMap<>();
+    private HashMap<Classfield, String> currentDefaultValues = new HashMap<>();
+    private HashMap<Classfield, String> otherDefaultValues = new HashMap<>();
+
     public DataClumpRefactoring(PsiElement currentElement, PsiElement otherElement, List<Property> matchingProperties) {
         this.matchingProperties = matchingProperties;
         this.currentElement = currentElement;
@@ -54,10 +59,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
         CodeSmellLogger.info("Selected Properties: " + selectedProperties);
 
         TypeScriptClass extractedClass;
-        HashMap<Classfield, TypeScriptParameter> currentConstructorParameters = new HashMap<>();
-        HashMap<Classfield, TypeScriptParameter> otherConstructorParameters = new HashMap<>();
-        HashMap<Classfield, String> currentDefaultValues = new HashMap<>();
-        HashMap<Classfield, String> otherDefaultValues = new HashMap<>();
 
         if (currentElement instanceof TypeScriptClass) {
             currentConstructorParameters = getRefactorableParameters((TypeScriptClass) currentElement, selectedProperties);
@@ -77,7 +78,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
 
             // Erstellen der neuen Klasse
-            List<Property> optional = getOptionalProperties(selectedProperties, currentConstructorParameters, otherConstructorParameters, currentDefaultValues, otherDefaultValues);
+            List<Property> optional = getOptionalProperties(selectedProperties);
             extractedClass = extractClass(targetDirectory, className, selectedProperties, optional);
         } else {
             extractedClass = dialog.getSelectedClass();
@@ -89,6 +90,22 @@ public class DataClumpRefactoring implements LocalQuickFix {
         refactorElement(currentElement, extractedClass, selectedProperties, currentConstructorParameters, currentDefaultValues);
         refactorElement(otherElement, extractedClass, selectedProperties, otherConstructorParameters, otherDefaultValues);
     }
+
+    private void adjustConstructor(TypeScriptClass psiClass , List<Property> matchingProperties, List<Property> optionalProperties) {
+        if (psiClass.getConstructor() == null) {
+            // create constructor
+            //TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, matchingProperties, optionalProperties);
+
+        }
+    }
+
+    private void addGetterAndSetter(TypeScriptClass psiClass, List<Property> properties) {
+        for (Property property : properties) {
+
+        }
+
+    }
+
 
     private HashMap<Classfield, TypeScriptParameter> getRefactorableParameters(TypeScriptClass psiClass, List<Property> properties) {
 
@@ -164,7 +181,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         return defaultValues;
     }
 
-    private List<Property> getOptionalProperties(List<Property> properties, HashMap<Classfield, TypeScriptParameter> currentConstructorParameters, HashMap<Classfield, TypeScriptParameter> otherConstructorParameters, HashMap<Classfield, String> currentDefaultValues, HashMap<Classfield, String> otherDefaultValues) {
+    private List<Property> getOptionalProperties(List<Property> properties) {
         List<Property> optionalProperties = new ArrayList<>();
         if (currentElement instanceof TypeScriptClass) {
             for (Property property : properties) {
@@ -381,7 +398,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
                         } else if (refactorableParameter.containsKey(property)) {
                             CodeSmellLogger.info("Found refactorable property " + property.getName());
                             CodeSmellLogger.info("Argument: " + refactorableParameter.get(property).getText());
+                            CodeSmellLogger.info("originalParameters: " + originalParameters);
+                            CodeSmellLogger.info("Parameter searched in original: " + new Parameter(refactorableParameter.get(property)));
                             int index = originalParameters.indexOf(new Parameter(refactorableParameter.get(property)));
+                            CodeSmellLogger.info("Found in original Parameters " + property.getName() + " at index " + index);
                             updatedArguments.append(originalArguments[index].getText()).append(", ");
                         }
                         else if (defaultValues.containsKey(property)) {
@@ -449,96 +469,41 @@ public class DataClumpRefactoring implements LocalQuickFix {
     public TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields, List<Property> optionalFields) {
         CodeSmellLogger.info("Extracting class...");
 
-        StringBuilder classCode = new StringBuilder();
-        classCode.append("class " + className + " {\n\n");
+        TypeScriptClass psiClass = PsiUtil.createClass(dir, className);
 
-        // constructor
-        classCode.append("  constructor(");
-
-        List<Property> requiredFields = new ArrayList<>(fields);
-        requiredFields.removeAll(optionalFields);
-
-        for (Property field : requiredFields) {
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-
-            if (field instanceof Classfield) {
-                List<String> modifiers = ((Classfield) field).getModifier();
-                for (String modifier :modifiers) {
-                    classCode.append(modifier + " ");
-                }
-                // If the field is public, do not use the underscore prefix
-                if (modifiers.contains("public")) {
-                    classCode.append(fieldName + ": " + fieldType + ", ");
-                } else {
-                    classCode.append("_" + fieldName + ": " + fieldType + ", ");
-                }
-            } else {
-                // For Parameters use the private as default visibility
-                classCode.append("private _" + fieldName + ": " + fieldType + ", ");
-            }
-        }
-        for (Property field : optionalFields) {
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-
-            if (field instanceof Classfield) {
-                List<String> modifiers = ((Classfield) field).getModifier();
-                for (String modifier :modifiers) {
-                    classCode.append(modifier + " ");
-                }
-                // If the field is public, do not use the underscore prefix
-                if (modifiers.contains("public")) {
-                    classCode.append(fieldName + "?: " + fieldType + ", ");
-                } else {
-                    classCode.append("_" + fieldName + "?: " + fieldType + ", ");
-                }
-            } else {
-                // For Parameters use the private as default visibility
-                classCode.append("private _" + fieldName + "?: " + fieldType + ", ");
-            }
-        }
-
-
-        // Remove trailing comma and close the constructor
-        if (!fields.isEmpty()) {
-            classCode.setLength(classCode.length() - 2);
-        }
-
-        classCode.append(") {}\n\n");
+        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, fields, optionalFields);
+        PsiUtil.addFunctionToClass(psiClass, constructor);
 
         // Getter and Setter
         for (Property field : fields) {
             // Skip public fields as they do not need getter and setter
             if (field instanceof Classfield && ((Classfield) field).getModifier().contains("public")) continue;
 
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
+            TypeScriptFunction getter;
+            TypeScriptFunction setter;
             if (optionalFields.contains(field)) {
-                classCode.append("  get " + fieldName + "(): " + fieldType + " | undefined {\n");
+                getter = PsiUtil.createGetter(psiClass, field, true);
+                setter = PsiUtil.createSetter(psiClass, field, true);
             } else {
-                classCode.append("  get " + fieldName + "(): " + fieldType + " {\n");
+                getter = PsiUtil.createGetter(psiClass, field, false);
+                setter = PsiUtil.createSetter(psiClass, field, false);
             }
-            classCode.append("    return this._" + fieldName + ";\n");
-            classCode.append("  }\n\n");
-
-            classCode.append("  set " + fieldName + "(value: " + fieldType + ") {\n");
-            classCode.append("    this._" + fieldName + " = value;\n");
-            classCode.append("  }\n\n");
+            PsiUtil.addFunctionToClass(psiClass, getter);
+            PsiUtil.addFunctionToClass(psiClass, setter);
         }
 
-        classCode.append("}\n");
 
-        // Create the new class file and add it to the directory
-        final PsiFile[] psiFile = new PsiFile[1];
+
 
         WriteCommandAction.runWriteCommandAction(dir.getProject(), () -> {
-            psiFile[0] = PsiFileFactory.getInstance(dir.getProject()).createFileFromText(className +" .ts", TypeScriptFileType.INSTANCE, classCode);
-            dir.add(psiFile[0]);
+            PsiFile file = PsiFileFactory.getInstance(dir.getProject()).createFileFromText(className + ".ts", "");
+            file.add(psiClass);
+            dir.add(file);
         });
 
+
         CodeSmellLogger.info("Class extracted.");
-        return PsiTreeUtil.getChildOfType(psiFile[0], TypeScriptClass.class);
+        return psiClass;
     }
 
     @Override
