@@ -23,6 +23,10 @@ public class Classfield extends Property {
         return modifier;
     }
 
+    public boolean isPublic(){
+        return this.modifier.contains("public");
+    }
+
     @Override
     public String toString() {
         return "[ClassField: name=" + this.getName() + ", type=" + this.getType() + ", modifiers=" + this.getModifier() + "]";

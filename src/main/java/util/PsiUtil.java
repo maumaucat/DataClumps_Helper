@@ -1,5 +1,4 @@
 package util;
-import com.google.rpc.Code;
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.*;
@@ -8,29 +7,31 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
-import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiDocumentManager;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiFileFactory;
+import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CodeStyleManager;
+import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.util.FileContentUtil;
+import com.intellij.refactoring.rename.RenameProcessor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 
 public class PsiUtil {
-    //TODO check for all 5 of them if they are actually necessary or can be replaced by create Statement
 
-    public static ES6FieldStatementImpl createJSFieldStatement(JSClass context, String name, JSType type, String visibility) {
-        String fieldText = visibility + " " + name + " : " + type.getTypeText() + ";";
+    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, JSType type, List<String> modifiers, boolean optional) {
+        StringBuilder fieldText = new StringBuilder();
+        for (String modifier : modifiers) {
+            fieldText.append(modifier + " ");
+        }
+        if (optional) {
+            fieldText.append(name + "?: " + type.getTypeText() + ";");
+        } else {
+            fieldText.append(name + " : " + type.getTypeText() + ";");
+        }
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
@@ -125,6 +126,7 @@ public class PsiUtil {
     }
 
     public static List<TypeScriptClass> getClassesThatHaveAll(List<Property> properties) {
+        //TODO constructor body must be fine
         List<TypeScriptClass> classes = new ArrayList<>();
 
         for (Property property : properties) {
@@ -145,6 +147,84 @@ public class PsiUtil {
             if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property)) return false;
         }
         return true;
+    }
+
+    public static Classfield getField(TypeScriptClass psiClass, String fieldName) {
+        for (Classfield classfield : getFields(psiClass)) {
+            if (classfield.getName().equals(fieldName)) return classfield;
+        }
+        return null;
+    }
+
+    public static PsiElement getPsiField(TypeScriptClass psiClass, Property property) {
+        HashMap<Classfield, PsiElement> fields = getFieldsToElement(psiClass);
+        return fields.get(property);
+    }
+
+    public static void rename(PsiElement element, String newName) {
+        // Initialize a RenameProcessor to rename the field and update all references
+        RenameProcessor renameProcessor = new RenameProcessor(
+                element.getProject(),       // Current project
+                element,  // The field to be renamed
+                newName,  // New name for the field
+                false,         // Search in comments and strings (set true if needed)
+                true           // Search for text occurrences (e.g., in non-code files)
+        );
+
+        // Run the refactoring process
+        renameProcessor.run();
+    }
+
+    public static void makeFieldOptional(TypeScriptField field) {
+        ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
+        WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
+            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType(), getModifiers(field), true));
+        });
+
+    }
+
+    public static boolean hasSetter(TypeScriptClass psiClass, Classfield classfield) {
+        if (classfield.isPublic()) return true;
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isSetProperty()) continue;
+
+            String setterName = psiFunction.getName();
+            String fieldName = classfield.getName();
+
+            // Setter should match field name directly or follow "set" convention
+            boolean nameMatches = setterName.equals(fieldName);
+
+            // Check if the parameter type of the setter matches the field type
+            boolean typeMatches = psiFunction.getParameters()[0].getJSType().equals(classfield.getType());
+
+            //TODO make sure that the right value is set
+            //TODO make sure that nothing is modified
+
+            if (nameMatches && typeMatches) return true;
+        }
+        return false;
+    }
+
+    public static boolean hasGetter(TypeScriptClass psiClass, Classfield classfield) {
+        if (classfield.isPublic()) return true;
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isGetProperty()) continue;
+
+            String getterName = psiFunction.getName();
+            String fieldName = classfield.getName();
+
+            // Getter should match field name directly or follow "get" convention
+            boolean nameMatches = getterName.equals(fieldName);
+
+            // Check if the return type of the getter matches the field type
+            boolean typeMatches = psiFunction.getReturnType().equals(classfield.getType());
+
+            //TODO make sure that the right value is returned
+            //TODO make sure that nothing is modified
+
+            if (nameMatches && typeMatches) return true;
+        }
+        return false;
     }
 
     public static List<Classfield> getFields(TypeScriptClass psiClass) {
@@ -171,6 +251,68 @@ public class PsiUtil {
 
     public static boolean isParameterField(TypeScriptParameter parameter) {
         return PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class).getTextLength() > 0;
+    }
+
+    public static boolean isAssignedNewValue(TypeScriptParameter parameter) {
+        // check if the parameter is assigned in the constructor to a field of the class that is in the properties list
+        for (PsiReference reference : ReferencesSearch.search(parameter)) {
+            // is the reference an assignment?
+            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
+
+            if (assignment != null && assignment.getLOperand().getFirstChild() == reference) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static List<Classfield> getAssignedToField(TypeScriptParameter parameter) {
+        List<Classfield> fields = new ArrayList<>();
+        for (PsiReference reference : ReferencesSearch.search(parameter)) {
+            // is the reference an assignment?
+            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
+
+            if (assignment != null && assignment.getROperand() == reference) {
+                if (assignment.getLOperand().getFirstChild() instanceof JSReferenceExpression referenceExpression) {
+                    Classfield field = resolveField(referenceExpression);
+                    if (field != null) fields.add(field);
+                }
+            }
+        }
+        return fields;
+    }
+
+    public static Classfield resolveField(JSReferenceExpression reference) {
+
+        PsiElement definition = reference.resolve();
+        if (definition instanceof TypeScriptField tsField) {
+            return new Classfield(tsField);
+        }
+        if (definition instanceof TypeScriptParameter tsParameter && PsiUtil.isParameterField(tsParameter)) {
+            return new Classfield(tsParameter);
+        }
+
+        return null;
+    }
+
+    public static Property resolveProperty(JSReferenceExpression reference) {
+        CodeSmellLogger.info("Resolving property for operand " + reference.getText());
+
+
+        PsiElement definition = reference.resolve();
+        CodeSmellLogger.info("Definition: " + definition);
+        if (definition instanceof TypeScriptField tsField) {
+            return new Classfield(tsField);
+        }
+        if (definition instanceof TypeScriptParameter tsParameter) {
+            if (PsiUtil.isParameterField(tsParameter)) {
+                return new Classfield(tsParameter);
+            } else {
+                return new Parameter(tsParameter);
+            }
+        }
+
+        return null;
     }
 
     public static HashMap<Classfield, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
@@ -224,6 +366,7 @@ public class PsiUtil {
         } else {
             setterText = "  set " + property.getName() + "(value: " + property.getType() + ") {\n";
         }
+        setterText += "    this._" + property.getName() + " = value;\n}";
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
@@ -243,14 +386,14 @@ public class PsiUtil {
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
     }
 
-    public static TypeScriptFunction createConstructor(TypeScriptClass psiClass, List<Property> allFields, List<Property> optionalFields) {
+    public static TypeScriptFunction createConstructor(TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body) {
 
         CodeSmellLogger.info("Creating constructor for class " + psiClass.getName());
         CodeSmellLogger.info("All fields: " + allFields);
-        CodeSmellLogger.info("Optional fields: " + optionalFields);
+        CodeSmellLogger.info("Optional fields: " + optional);
 
 
-        if (psiClass!=null && psiClass.getConstructor() != null) {
+        if (psiClass != null && psiClass.getConstructor() != null) {
             CodeSmellLogger.error("Constructor already exists for class " + psiClass.getName(), new IllegalArgumentException());
             return null;
         }
@@ -260,91 +403,76 @@ public class PsiUtil {
 
         StringBuilder constructorCode = new StringBuilder();
 
-        List<Property> requiredFields = new ArrayList<>(allFields);
-        requiredFields.removeAll(optionalFields);
+        List<Property> requiredProperties = new ArrayList<>(allFields);
+        requiredProperties.addAll(allParameters);
+        requiredProperties.removeAll(optional);
 
-        CodeSmellLogger.info("Required fields: " + requiredFields);
+        CodeSmellLogger.info("Required Properties: " + requiredProperties);
+        CodeSmellLogger.info("Optional: " + optional);
 
         constructorCode.append("constructor(");
         List<Property> assignedFields = new ArrayList<>();
 
-        for (Property field : requiredFields) {
+        for (Property property : requiredProperties) {
 
-            CodeSmellLogger.info("Adding required field " + field.getName() + " to constructor.");
+            final String propertyName = property.getName();
+            final String propertyType = property.getType().getTypeText();
 
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-
-            // if field does not yet exist in the class, define it in the constructor
-            if (!classfields.contains(field)) {
-                CodeSmellLogger.info("Field " + fieldName + " does not yet exist in the class, defining it in the constructor.");
-                // for new Classfields use the modifier of the field
-                if (field instanceof Classfield) {
-                    CodeSmellLogger.info("Field " + fieldName + " is a Classfield.");
-                    List<String> modifiers = ((Classfield) field).getModifier();
+            // if property does not yet exist in the class, define it in the constructor
+            if (!classfields.contains(property) && allFields.contains(property)) {
+                // for new Classfields use the modifier of the property
+                if (property instanceof Classfield) {
+                    List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
                         constructorCode.append(modifier + " ");
                     }
-                    // If the field is public, do not use the underscore prefix
+                    // If the property is public, do not use the underscore prefix
                     if (modifiers.contains("public")) {
-                        CodeSmellLogger.info("Field added: " + fieldName + ": " + fieldType);
-                        constructorCode.append(fieldName + ": " + fieldType + ", ");
+                        constructorCode.append(propertyName + ": " + propertyType + ", ");
                     } else {
-                        CodeSmellLogger.info("Field added: _" + fieldName + ": " + fieldType);
-                        constructorCode.append("_" + fieldName + ": " + fieldType + ", ");
+                        constructorCode.append("_" + propertyName + ": " + propertyType + ", ");
                     }
                 } else {
                     // For Parameters use the private as default visibility
-                    CodeSmellLogger.info("Field " + fieldName + " is a Parameter.");
-                    CodeSmellLogger.info("Field added: _" + fieldName + ": " + fieldType);
-                    constructorCode.append("private _" + fieldName + ": " + fieldType + ", ");
+                    constructorCode.append("private _" + propertyName + ": " + propertyType + ", ");
                 }
             } else {
-                // if field already exists in the class assign it in the constructor
-                CodeSmellLogger.info("Field " + fieldName + " already exists in the class, assigning it in the constructor.");
-                CodeSmellLogger.info("Field added: " + fieldName + ": " + fieldType);
-                constructorCode.append(fieldName + ": " + fieldType + ", ");
-                assignedFields.add(field);
+                // if property already exists in the class or is a parameter just add it
+                constructorCode.append(propertyName + ": " + propertyType + ", ");
+                if (allFields.contains(property)) {
+                    assignedFields.add(property);
+                }
             }
         }
 
-        for (Property field : optionalFields) {
+        for (Property property : optional) {
 
-            CodeSmellLogger.info("Adding optional field " + field.getName() + " to constructor.");
+            final String propertyName = property.getName();
+            final String propertyType = property.getType().getTypeText();
 
-            final String fieldName = field.getName();
-            final String fieldType = field.getType().getTypeText();
-
-            // if field does not yet exist in the class, define it in the constructor
-            if (!classfields.contains(field)) {
-                CodeSmellLogger.info("Field " + fieldName + " does not yet exist in the class, defining it in the constructor.");
-                // for new Classfields use the modifier of the field
-                if (field instanceof Classfield) {
-                    CodeSmellLogger.info("Field " + fieldName + " is a Classfield.");
-                    List<String> modifiers = ((Classfield) field).getModifier();
+            // if property does not yet exist in the class, define it in the constructor
+            if (!classfields.contains(property) && allFields.contains(property)) {
+                // for new Classfields use the modifier of the property
+                if (property instanceof Classfield) {
+                    List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
                         constructorCode.append(modifier + " ");
                     }
-                    // If the field is public, do not use the underscore prefix
+                    // If the property is public, do not use the underscore prefix
                     if (modifiers.contains("public")) {
-                        CodeSmellLogger.info("Field added: " + fieldName + "?: " + fieldType);
-                        constructorCode.append(fieldName + "?: " + fieldType + ", ");
+                        constructorCode.append(propertyName + "?: " + propertyType + ", ");
                     } else {
-                        CodeSmellLogger.info("Field added: _" + fieldName + "?: " + fieldType);
-                        constructorCode.append("_" + fieldName + "?: " + fieldType + ", ");
+                        constructorCode.append("_" + propertyName + "?: " + propertyType + ", ");
                     }
                 } else {
                     // For Parameters use the private as default visibility
-                    CodeSmellLogger.info("Field " + fieldName + " is a Parameter.");
-                    CodeSmellLogger.info("Field added: _" + fieldName + "?: " + fieldType);
-                    constructorCode.append("private _" + fieldName + "?: " + fieldType + ", ");
+                    constructorCode.append("private _" + propertyName + "?: " + propertyType + ", ");
                 }
             } else {
-                // if field already exists in the class assign it in the constructor
-                CodeSmellLogger.info("Field " + fieldName + " already exists in the class, assigning it in the constructor.");
-                CodeSmellLogger.info("Field added: " + fieldName + "?: " + fieldType);
-                constructorCode.append(fieldName + "?: " + fieldType + ", ");
-                assignedFields.add(field);
+                constructorCode.append(propertyName + "?: " + propertyType + ", ");
+                if (allFields.contains(property)) {
+                    assignedFields.add(property);
+                }
             }
         }
 
@@ -360,6 +488,11 @@ public class PsiUtil {
         // add assignments
         for (Property field : assignedFields) {
             constructorCode.append("\nthis." + field.getName() + " = " + field.getName() + ";");
+        }
+
+        // add the constructor body
+        if (body != null) {
+            constructorCode.append("\n" + removeBrackets(body.getText()));
         }
 
         constructorCode.append("}\n");
@@ -396,5 +529,9 @@ public class PsiUtil {
         });
     }
 
+    public static String removeBrackets(String text) {
+        text = text.trim();
+        return text.substring(1, text.length() - 1);
+    }
 
 }
