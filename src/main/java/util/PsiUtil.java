@@ -125,20 +125,6 @@ public class PsiUtil {
         return modifiers;
     }
 
-    public static List<TypeScriptClass> getClassesThatHaveAll(List<Property> properties) {
-        //TODO constructor body must be fine
-        List<TypeScriptClass> classes = new ArrayList<>();
-
-        for (Property property : properties) {
-            if (Index.getPropertiesToClasses().get(property) == null) continue;
-            for (TypeScriptClass psiClass : Index.getPropertiesToClasses().get(property)) {
-                if (!psiClass.isValid() || classes.contains(psiClass)) continue;
-                if (hasAll(psiClass, properties)) classes.add(psiClass);
-            }
-        }
-        return classes;
-    }
-
     // classfields must match
     public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
         List<Classfield> classProperties = Index.getClassesToClassFields().get(psiClass);
@@ -149,9 +135,17 @@ public class PsiUtil {
         return true;
     }
 
-    public static Classfield getField(TypeScriptClass psiClass, String fieldName) {
+    public static Classfield getClassfield(TypeScriptClass psiClass, String fieldName) {
         for (Classfield classfield : getFields(psiClass)) {
             if (classfield.getName().equals(fieldName)) return classfield;
+        }
+        return null;
+    }
+
+    public static PsiElement getField(TypeScriptClass psiClass, String fieldName) {
+        HashMap<Classfield, PsiElement> fields = getFieldsToElement(psiClass);
+        for (Classfield classfield : fields.keySet()) {
+            if (classfield.getName().equals(fieldName)) return fields.get(classfield);
         }
         return null;
     }
@@ -266,6 +260,7 @@ public class PsiUtil {
         return false;
     }
 
+
     public static List<Classfield> getAssignedToField(TypeScriptParameter parameter) {
         List<Classfield> fields = new ArrayList<>();
         for (PsiReference reference : ReferencesSearch.search(parameter)) {
@@ -296,11 +291,7 @@ public class PsiUtil {
     }
 
     public static Property resolveProperty(JSReferenceExpression reference) {
-        CodeSmellLogger.info("Resolving property for operand " + reference.getText());
-
-
         PsiElement definition = reference.resolve();
-        CodeSmellLogger.info("Definition: " + definition);
         if (definition instanceof TypeScriptField tsField) {
             return new Classfield(tsField);
         }

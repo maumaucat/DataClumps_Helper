@@ -22,6 +22,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 import static com.intellij.codeInsight.intention.preview.IntentionPreviewUtils.getOriginalFile;
 
@@ -132,7 +133,7 @@ public class DataClumpDialog extends DialogWrapper {
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
                 if (existingClassButton.isSelected()) {
-                    setClassSelection(PsiUtil.getClassesThatHaveAll(getProperties()));
+                    setClassSelection(DataClumpRefactoring.getUsableClasses(getProperties()));
                 }
             });
             checkBoxPanel.add(checkBox);
@@ -156,7 +157,7 @@ public class DataClumpDialog extends DialogWrapper {
         this.existingClassLabel = new JLabel("Existing class:");
         this.existingComboBox = existingComboBox;
 
-        setClassSelection(PsiUtil.getClassesThatHaveAll(getProperties()));
+        setClassSelection(DataClumpRefactoring.getUsableClasses(getProperties()));
     }
 
     private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {
@@ -193,7 +194,7 @@ public class DataClumpDialog extends DialogWrapper {
         });
     }
 
-    private void setClassSelection(List<TypeScriptClass> classes) {
+    private void setClassSelection(Set<TypeScriptClass> classes) {
         existingComboBox.removeAllItems();
 
         for (TypeScriptClass tsClass : classes) {
