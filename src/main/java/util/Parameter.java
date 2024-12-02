@@ -5,11 +5,11 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 public class Parameter extends Property{
 
     public Parameter(TypeScriptParameter parameter) {
-        super(parameter.getName(), parameter.getJSType());
+        super(parameter.getName(), parameter.getJSType().getTypeText());
     }
 
     public Parameter(String name, JSType type) {
-        super(name, type);
+        super(name, type.getTypeText());
     }
 
     @Override

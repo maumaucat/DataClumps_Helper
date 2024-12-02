@@ -9,12 +9,12 @@ public class Classfield extends Property {
     private final List<String> modifier;
 
     public Classfield(TypeScriptField field) {
-        super(field.getName(), field.getJSType());
+        super(field.getName(), field.getJSType().getTypeText());
         this.modifier = PsiUtil.getModifiers(field);
     }
 
     public Classfield(TypeScriptParameter parameter) {
-        super(parameter.getName(), parameter.getJSType());
+        super(parameter.getName(), parameter.getJSType().getTypeText());
         this.modifier = PsiUtil.getModifiers(parameter);
     }
 

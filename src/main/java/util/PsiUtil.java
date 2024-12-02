@@ -407,7 +407,7 @@ public class PsiUtil {
         for (Property property : requiredProperties) {
 
             final String propertyName = property.getName();
-            final String propertyType = property.getType().getTypeText();
+            final String propertyType = property.getType();
 
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {
@@ -439,7 +439,7 @@ public class PsiUtil {
         for (Property property : optional) {
 
             final String propertyName = property.getName();
-            final String propertyType = property.getType().getTypeText();
+            final String propertyType = property.getType();
 
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {

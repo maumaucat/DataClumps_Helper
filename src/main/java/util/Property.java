@@ -1,13 +1,11 @@
 package util;
 
-import com.intellij.lang.javascript.psi.JSType;
-
 public abstract class Property {
 
     private final String name;
-    private final JSType type;
+    private final String type;
 
-    public Property(String name, JSType type) {
+    public Property(String name, String type) {
 
         // remove leading underscore from name since it might be added for private properties but is not relevant for comparison
         if (name.startsWith("_")) {
@@ -22,7 +20,7 @@ public abstract class Property {
         return name;
     }
 
-    public JSType getType() {
+    public String getType() {
         return type;
     }
 
@@ -34,6 +32,7 @@ public abstract class Property {
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof Property otherProperty)) return false;
+        CodeSmellLogger.info("is instanceof");
         return name.equals(otherProperty.name) && type.equals(otherProperty.type);
     }
 
