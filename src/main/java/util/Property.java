@@ -32,7 +32,6 @@ public abstract class Property {
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof Property otherProperty)) return false;
-        CodeSmellLogger.info("is instanceof");
         return name.equals(otherProperty.name) && type.equals(otherProperty.type);
     }
 

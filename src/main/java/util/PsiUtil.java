@@ -235,7 +235,7 @@ public class PsiUtil {
             for (JSParameterListElement psiParameter : constructor.getParameters()) {
                 if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
                 // test if parameter is actually field
-                if (isParameterField((TypeScriptParameter) psiParameter)) { //TODO NOT VERY ELEGANT
+                if (isParameterField((TypeScriptParameter) psiParameter)) {
                     fields.add(new Classfield((TypeScriptParameter) psiParameter));
                 }
             }
@@ -259,7 +259,6 @@ public class PsiUtil {
         }
         return false;
     }
-
 
     public static List<Classfield> getAssignedToField(TypeScriptParameter parameter) {
         List<Classfield> fields = new ArrayList<>();
@@ -326,7 +325,6 @@ public class PsiUtil {
             }
         }
         return fields;
-
     }
 
     public static TypeScriptFunction createGetter(PsiElement context, Property property, boolean optional) {

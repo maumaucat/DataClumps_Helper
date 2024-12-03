@@ -7,6 +7,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
@@ -672,6 +673,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         // Potenziell passende Klassen finden
         List<TypeScriptClass> potentialClasses = Index.getPropertiesToClasses().get(firstProperty);
         for (TypeScriptClass psiClass : potentialClasses) {
+            if (psiClass.getName() == null) continue;
             if (PsiUtil.hasAll(psiClass, properties)) {
                 matchingClasses.add(psiClass);
             }

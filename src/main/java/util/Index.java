@@ -1,13 +1,13 @@
 package util;
-
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
+import com.intellij.lang.javascript.psi.ecma6.*;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.FileTypeIndex;
@@ -27,6 +27,8 @@ public class Index {
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
 
     private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
+
+    private static HashMap<TypeScriptClass, List<TypeScriptClass>> superClasses;
 
     public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
@@ -48,6 +50,10 @@ public class Index {
         return functionsToParameters;
     }
 
+    public static HashMap<TypeScriptClass, List<TypeScriptClass>> getSuperClasses() {
+        return superClasses;
+    }
+
     private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
         List<Parameter> parameters = new ArrayList<>();
         for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
@@ -59,7 +65,7 @@ public class Index {
         return parameters;
     }
 
-    public static Classfield getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) {
+    public static Classfield getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) { //TODO duplicate to getField?
         List<Classfield> classfields = classesToClassFields.get(psiClass);
         for (Classfield classField : classfields) {
             if (classField.equals(property)) return classField;
@@ -70,7 +76,12 @@ public class Index {
 
     public static void addClass(TypeScriptClass psiClass) {
 
-        qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
+        if (psiClass.getQualifiedName() != null) {
+            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
+        }
+
+        superClasses.put(psiClass, resolveHierarchy(psiClass));
+
         classesToClassFields.put(psiClass, new ArrayList<>());
         List<Classfield> classfields = PsiUtil.getFields(psiClass);
 
@@ -119,12 +130,18 @@ public class Index {
     }
 
     public static void updateClass(TypeScriptClass psiClass) {
-        qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
+
         // wenn die Klasse neu ist -> hinzufügen
         if (!classesToClassFields.containsKey(psiClass)) {
             addClass(psiClass);
             return;
         }
+
+        if (psiClass.getQualifiedName() != null) {
+            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
+        }
+
+        superClasses.put(psiClass, resolveHierarchy(psiClass));
 
         // alle aktuellen Klassenfelder der Klasse speichern
         List<Classfield> new_Fields = PsiUtil.getFields(psiClass);
@@ -179,6 +196,7 @@ public class Index {
         classesToClassFields = new HashMap<>();
         functionsToParameters = new HashMap<>();
         qualifiedNamesToClasses = new HashMap<>();
+        superClasses = new HashMap<>();
 
         CodeSmellLogger.info("Building index...");
 
@@ -189,7 +207,6 @@ public class Index {
 
             // Alle TypeScriptFiles
             for (VirtualFile virtualFile : FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project))) {
-
                 PsiFile psiFile = manager.findFile(virtualFile);
 
                 // iterate all functions in file
@@ -197,8 +214,12 @@ public class Index {
                     addFunction(psiFunction);
                 }
 
-                //iterate all classes in file
-                for (TypeScriptClass psiClass : PsiTreeUtil.getChildrenOfTypeAsList(psiFile, TypeScriptClass.class)) {
+                Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                        element instanceof TypeScriptClass
+                ));
+
+                for (PsiElement psiElement : allClasses) {
+                    TypeScriptClass psiClass = (TypeScriptClass) psiElement;
                     addClass(psiClass);
                 }
             }
@@ -210,6 +231,7 @@ public class Index {
         printParametersToFunctions();
         printClassesToClassFields();
         printFunctionsToParameter();
+        printSuperClasses();
 
     }
 
@@ -219,8 +241,12 @@ public class Index {
         for (Property classField : propertiesToClasses.keySet()) {
             List<TypeScriptClass> classList = propertiesToClasses.get(classField);
             StringBuilder classes = new StringBuilder("[");
-            for (TypeScriptClass typeScriptClass : classList) {
-                classes.append(typeScriptClass.getName()).append(",");
+            for (TypeScriptClass psiClass : classList) {
+                if (psiClass.getName() != null) {
+                    classes.append(psiClass.getName()).append(",");
+                } else {
+                    classes.append("anonymous").append(",");
+                }
             }
             classes.append("]");
             CodeSmellLogger.info(classField + " : " + classes);
@@ -265,9 +291,41 @@ public class Index {
                     classFields.append(classField.toString()).append(",");
                 }
                 classFields.append("]");
-                CodeSmellLogger.info(clazz.getName() + " " + classFields);
+                if (clazz.getName() != null){
+                    CodeSmellLogger.info(clazz.getName() + " " + classFields);
+                } else {
+                    CodeSmellLogger.info("anonymous " + classFields);
+                }
             }
         });
+    }
+
+    public static void printSuperClasses() {
+        ApplicationManager.getApplication().runReadAction(() -> {
+            CodeSmellLogger.info("SuperClasses: ");
+            for (TypeScriptClass clazz : superClasses.keySet()) {
+                if (clazz.getName() != null) {
+                    CodeSmellLogger.info(clazz.getName() + " : " + superClasses.get(clazz));
+                } else {
+                    CodeSmellLogger.info("anonymous : " + superClasses.get(clazz));
+                }
+            }
+        });
+    }
+
+    private static List<TypeScriptClass> resolveHierarchy(TypeScriptClass tsClass) {
+
+        List<TypeScriptClass> superClasses = new ArrayList<>();
+        superClasses.add(tsClass);
+
+        for (JSClass psiClass : tsClass.getSuperClasses()) {
+            if (!(psiClass instanceof TypeScriptClass)) {
+                CodeSmellLogger.warn("Superclass is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
+            };
+            superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
+        }
+
+        return superClasses;
     }
 
 }
