@@ -89,7 +89,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             // alle Funktionen, die eine passende Property haben
             if (!Index.getPropertiesToFunctions().containsKey(classfield)) continue;
             for (TypeScriptFunction otherFunction : Index.getPropertiesToFunctions().get(classfield)) {
-                if (!otherFunction.isValid()) continue; // TODO DELETE INVALID ENTRIES
+                if (!checkClassFunctionPair(otherFunction, currentClass)) continue;
 
                 // add to Map
                 if (!potentialFieldParameterDataClumps.containsKey(otherFunction)) {
@@ -155,7 +155,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             // alle Klassen die eine passende Property haben
             if (!Index.getPropertiesToClasses().containsKey(parameter)) continue;
             for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(parameter)) {
-                if(!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
+                if (!checkClassFunctionPair(currentFunction, otherClass)) continue;
 
                 // add to Map
                 if (!potentialParameterFieldDataClumps.containsKey(otherClass)) {
@@ -204,10 +204,10 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     private static boolean checkClassFunctionPair(TypeScriptFunction function, TypeScriptClass TypeScriptClass) {
         TypeScriptClass functionClass = PsiTreeUtil.getParentOfType(function, TypeScriptClass.class);
+         boolean valid = function.isValid() && TypeScriptClass.isValid();
+         boolean SameHierarchy = inSameHierarchy(functionClass, TypeScriptClass);
 
-
-
-        return true;
+        return valid && !SameHierarchy;
     }
 
     private static boolean checkFunctions(TypeScriptFunction function1, TypeScriptFunction function2) {
@@ -226,6 +226,14 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     private static boolean inSameHierarchy(TypeScriptClass class1, TypeScriptClass class2) {
         if (class1 == null || class2 == null) return false;
+
+        CodeSmellLogger.info("Checking if " + class1.getName() + " and " + class2.getName() + " are in the same hierarchy.");
+
+        CodeSmellLogger.info("Class1 " + class1.getText());
+        CodeSmellLogger.info("Class2 " + class2.getText());
+
+        CodeSmellLogger.info("Superclasses of " + class1.getName() + ": " + Index.getSuperClasses().get(class1));
+        CodeSmellLogger.info("Superclasses of " + class2.getName() + ": " + Index.getSuperClasses().get(class2));
 
         List<TypeScriptClass> list1 = Index.getSuperClasses().get(class1);
         List<TypeScriptClass> list2 = Index.getSuperClasses().get(class2);
