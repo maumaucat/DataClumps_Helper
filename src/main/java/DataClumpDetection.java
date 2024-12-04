@@ -206,14 +206,19 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
     private static boolean isOverridden(TypeScriptFunction function1, TypeScriptFunction function2) {
-        TypeScriptClass class1 = PsiTreeUtil.getParentOfType(function1, TypeScriptClass.class);
-        TypeScriptClass class2 = PsiTreeUtil.getParentOfType(function2, TypeScriptClass.class);
+        CodeSmellLogger.info("Checking if " + function1.getName() + " and " + function2.getName() + " are overridden.");
+
+        JSClass class1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
+        JSClass class2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
+
+        CodeSmellLogger.info("Class of " + function1.getName() + ": " + class1.getName());
+        CodeSmellLogger.info("Class of " + function2.getName() + ": " + class2.getName());
 
 
         if (class1 == class2 || !function1.getName().equals(function2.getName())) return false;
 
-        List<TypeScriptClass> common = getCommonClassesInHierarchy(class1, class2);
-        for (TypeScriptClass commonClass : common) {
+        List<JSClass> common = getCommonClassesInHierarchy(class1, class2);
+        for (JSClass commonClass : common) {
             if (commonClass.findFunctionByName(function1.getName()) != null) {
                 return true;
             }
@@ -227,13 +232,13 @@ public class DataClumpDetection extends LocalInspectionTool {
         return !getCommonClassesInHierarchy(class1, class2).isEmpty();
     }
 
-    private static List<TypeScriptClass> getCommonClassesInHierarchy(TypeScriptClass class1, TypeScriptClass class2) {
+    private static List<JSClass> getCommonClassesInHierarchy(JSClass class1, JSClass class2) {
         if (class1 == null || class2 == null) return new ArrayList<>();
 
         CodeSmellLogger.info("Checking if " + class1.getName() + " and " + class2.getName() + " are in the same hierarchy.");
 
-        List<TypeScriptClass> superClasses1 = resolveHierarchy(class1);
-        List<TypeScriptClass> superClasses2 = resolveHierarchy(class2);
+        List<JSClass> superClasses1 = resolveHierarchy(class1);
+        List<JSClass> superClasses2 = resolveHierarchy(class2);
 
         CodeSmellLogger.info("Superclasses of " + class1.getName() + ": " + superClasses1);
         CodeSmellLogger.info("Superclasses of " + class2.getName() + ": " + superClasses2);
@@ -245,25 +250,17 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
 
-    private static List<TypeScriptClass> resolveHierarchy(TypeScriptClass tsClass) {
+    private static List<JSClass> resolveHierarchy(JSClass tsClass) {
 
-        List<TypeScriptClass> superClasses = new ArrayList<>();
+        List<JSClass> superClasses = new ArrayList<>();
         superClasses.add(tsClass);
 
         for (JSClass psiClass : tsClass.getSuperClasses()) {
-            if (!(psiClass instanceof TypeScriptClass)) {
-                CodeSmellLogger.warn("Superclass is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
-            } else {
-                superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
-            }
+            superClasses.addAll(resolveHierarchy(psiClass));
         }
 
         for (JSClass psiClass : tsClass.getImplementedInterfaces()) {
-            if (!(psiClass instanceof TypeScriptClass)) {
-                CodeSmellLogger.warn("Interface is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
-            } else {
-                superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
-            }
+            superClasses.addAll(resolveHierarchy(psiClass));
         }
 
         return superClasses;
