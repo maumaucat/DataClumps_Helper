@@ -22,16 +22,21 @@ import java.util.Set;
 
 public class PsiUtil {
 
-    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, JSType type, List<String> modifiers, boolean optional) {
+    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, JSType type, List<String> modifiers, boolean optional, String defaultValue) {
         StringBuilder fieldText = new StringBuilder();
         for (String modifier : modifiers) {
             fieldText.append(modifier + " ");
         }
         if (optional) {
-            fieldText.append(name + "?: " + type.getTypeText() + ";");
+            fieldText.append(name + "?: " + type.getTypeText());
         } else {
-            fieldText.append(name + " : " + type.getTypeText() + ";");
+            fieldText.append(name + " : " + type.getTypeText());
         }
+        if (defaultValue != null) {
+            fieldText.append(" = " + defaultValue);
+        }
+        fieldText.append(";");
+
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
@@ -171,10 +176,11 @@ public class PsiUtil {
 
     public static void makeFieldOptional(TypeScriptField field) {
         ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
+        JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
+        String defaultValue = initializer != null ? initializer.getText() : null;
         WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
-            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType(), getModifiers(field), true));
+            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType(), getModifiers(field), true, defaultValue));
         });
-
     }
 
     public static boolean hasSetter(TypeScriptClass psiClass, Classfield classfield) {
@@ -189,7 +195,8 @@ public class PsiUtil {
             boolean nameMatches = setterName.equals(fieldName);
 
             // Check if the parameter type of the setter matches the field type
-            boolean typeMatches = psiFunction.getParameters()[0].getJSType().equals(classfield.getType());
+            Parameter setterParameter = new Parameter((TypeScriptParameter) psiFunction.getParameters()[0]);
+            boolean typeMatches = setterParameter.getTypes().equals(classfield.getTypes());
 
             //TODO make sure that the right value is set
             //TODO make sure that nothing is modified
@@ -211,7 +218,8 @@ public class PsiUtil {
             boolean nameMatches = getterName.equals(fieldName);
 
             // Check if the return type of the getter matches the field type
-            boolean typeMatches = psiFunction.getReturnType().equals(classfield.getType());
+            Parameter getterReturn = new Parameter("return", psiFunction.getReturnType());
+            boolean typeMatches = getterReturn.getTypes().equals(classfield.getTypes());
 
             //TODO make sure that the right value is returned
             //TODO make sure that nothing is modified
@@ -330,9 +338,9 @@ public class PsiUtil {
     public static TypeScriptFunction createGetter(PsiElement context, Property property, boolean optional) {
         StringBuilder getterText = new StringBuilder();
         if (optional) {
-            getterText.append("  get " + property.getName() + "(): " + property.getType() + " | undefined {\n");
+            getterText.append("  get " + property.getName() + "(): " + property.getTypesAsString() + " | undefined {\n");
         } else {
-            getterText.append("  get " + property.getName() + "(): " + property.getType() + " {\n");
+            getterText.append("  get " + property.getName() + "(): " + property.getTypesAsString() + " {\n");
         }
         getterText.append("    return this._" + property.getName() + ";\n}");
 
@@ -351,9 +359,9 @@ public class PsiUtil {
 
         String setterText;
         if (optional) {
-            setterText = "  set " + property.getName() + "(value: " + property.getType() + " | undefined) {\n";
+            setterText = "  set " + property.getName() + "(value: " + property.getTypesAsString() + " | undefined) {\n";
         } else {
-            setterText = "  set " + property.getName() + "(value: " + property.getType() + ") {\n";
+            setterText = "  set " + property.getName() + "(value: " + property.getTypesAsString() + ") {\n";
         }
         setterText += "    this._" + property.getName() + " = value;\n}";
 
@@ -405,7 +413,7 @@ public class PsiUtil {
         for (Property property : requiredProperties) {
 
             final String propertyName = property.getName();
-            final String propertyType = property.getType();
+            final String propertyType = property.getTypesAsString();
 
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {
@@ -437,7 +445,7 @@ public class PsiUtil {
         for (Property property : optional) {
 
             final String propertyName = property.getName();
-            final String propertyType = property.getType();
+            final String propertyType = property.getTypesAsString();
 
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {
@@ -465,10 +473,8 @@ public class PsiUtil {
             }
         }
 
-
-
         // Remove trailing comma and close the constructor
-        if (!allFields.isEmpty()) {
+        if (!allFields.isEmpty() || !allParameters.isEmpty()) {
             constructorCode.setLength(constructorCode.length() - 2);
         }
 

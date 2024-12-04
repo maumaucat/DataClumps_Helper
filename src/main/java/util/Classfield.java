@@ -9,12 +9,12 @@ public class Classfield extends Property {
     private final List<String> modifier;
 
     public Classfield(TypeScriptField field) {
-        super(field.getName(), field.getJSType().getTypeText());
+        super(field.getName(), field.getJSType());
         this.modifier = PsiUtil.getModifiers(field);
     }
 
     public Classfield(TypeScriptParameter parameter) {
-        super(parameter.getName(), parameter.getJSType().getTypeText());
+        super(parameter.getName(), parameter.getJSType());
         this.modifier = PsiUtil.getModifiers(parameter);
     }
 
@@ -29,12 +29,12 @@ public class Classfield extends Property {
 
     @Override
     public String toString() {
-        return "[ClassField: name=" + this.getName() + ", type=" + this.getType() + ", modifiers=" + this.getModifier() + "]";
+        return "[ClassField: name=" + this.getName() + ", type=" + this.getTypes() + ", modifiers=" + this.getModifier() + "]";
     }
 
     public boolean matches(Classfield field){
          return this.getName().equals(field.getName())
-                && this.getType().equals(field.getType())
+                && this.getTypes().equals(field.getTypes())
                 && this.getModifier().equals(field.getModifier());
     }
 }

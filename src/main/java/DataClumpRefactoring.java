@@ -15,6 +15,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.sql.dataFlow.instructions.SqlPseudoValueSource;
+import io.ktor.util.Hash;
 import org.jetbrains.annotations.NotNull;
 import util.*;
 
@@ -157,13 +158,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     } else if (!matchingProperties.contains(definingParameters.get(parameter))) {
                         CodeSmellLogger.info("Parameter " + psiParameter.getName() + " defining a field that is not in the list of properties -> adding to optional properties");
                         optionalProperties.add(definingParameters.get(parameter));
-                        PsiElement psiElement = PsiUtil.getPsiField(psiClass, definingParameters.get(parameter));
-                        if (psiElement instanceof TypeScriptField psiField) {
-                            CodeSmellLogger.info("Making field " + psiField.getName() + " optional");
-                            PsiUtil.makeFieldOptional(psiField);
-                        } else{
-                            CodeSmellLogger.warn("Parameter " + parameter + " defines " + definingParameters.get(parameter) + " but is not a field");
-                        }
                     }
                 }
             }
@@ -175,16 +169,16 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     CodeSmellLogger.info("Property " + property.getName() + " not defined in constructor -> adding to constructor fields");
                     constructorFields.add(property);
                     optionalProperties.add(property);
-                    PsiElement psiElement = PsiUtil.getPsiField(psiClass, property);
-                    if (psiElement instanceof TypeScriptField psiField) {
-                        CodeSmellLogger.info("Making field " + psiField.getName() + " optional");
-                        PsiUtil.makeFieldOptional(psiField);
-                    } else {
-                        CodeSmellLogger.warn("Property " + property + " not defined in constructor but is not a TypeScriptField");
-                    }
                 }
-
             }
+
+            for (Property optionalProperty : optionalProperties) {
+                PsiElement field = PsiUtil.getPsiField(psiClass, optionalProperty);
+                if (field instanceof TypeScriptField) {
+                    PsiUtil.makeFieldOptional((TypeScriptField) field);
+                }
+            }
+
 
             JSBlockStatement body = constructor.getBlock();
 
@@ -361,21 +355,24 @@ public class DataClumpRefactoring implements LocalQuickFix {
         String fieldName = extractedClass.getName().toLowerCase();
 
         // Neues Feld hinzufügen
-        addNewFieldToClass(psiClass, extractedClass, fieldName);
+        addNewFieldToClass(psiClass, extractedClass, fieldName, defaultValues);
 
         // Field-Usages aktualisieren
         updateFieldReferences(psiClass, properties, fieldName);
 
+
         // Konstruktor aktualisieren
         updateConstructor(psiClass, properties, extractedClass, fieldName, definedClassfields, defaultValues);
+
+
 
         CodeSmellLogger.info("Class refactord.");
     }
 
-    private void addNewFieldToClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, String fieldName) {
+    private void addNewFieldToClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, String> defaultValues) {
 
         ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
-                psiClass, fieldName, extractedClass.getJSType(), List.of("public"), false
+                psiClass, fieldName, extractedClass.getJSType(), List.of("public"), false, getDefaultInit(extractedClass, defaultValues)
         );
 
         PsiElement[] existingFields = psiClass.getFields();
@@ -388,6 +385,33 @@ public class DataClumpRefactoring implements LocalQuickFix {
         });
 
     }
+
+    private String getDefaultInit(TypeScriptClass extractedClass, HashMap<Classfield, String> defaultValues) {
+
+        List<Property> extractedParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
+
+        StringBuilder init = new StringBuilder();
+        init.append("new ").append(extractedClass.getName()).append("(");
+
+        for (Property property : extractedParameters) {
+            if (defaultValues.containsKey(property)) {
+                CodeSmellLogger.info("Found default value for property " + property.getName());
+                init.append(defaultValues.get(property)).append(", ");
+            } else {
+                CodeSmellLogger.info("Property " + property.getName() + " not found -> using undefined");
+                init.append("undefined, ");
+            }
+        }
+
+        if (!extractedParameters.isEmpty()) {
+            init.setLength(init.length() - 2);
+        }
+
+        init.append(");");
+
+        return init.toString();
+    }
+
 
     private void updateConstructor(TypeScriptClass psiClass, List<Property> properties, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, TypeScriptParameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
@@ -424,7 +448,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
                         replaceReferenceWithGetter(psiClass, reference, fieldName, classfield.getName());
                     }
                 }
-
 
                 if (psiField instanceof TypeScriptField) {
                     WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
@@ -668,13 +691,18 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // Validierung: Erste Property nicht im Index
         Property firstProperty = properties.get(0);
+        CodeSmellLogger.info("First property: " + firstProperty);
         if (!Index.getPropertiesToClasses().containsKey(firstProperty)) return matchingClasses;
 
         // Potenziell passende Klassen finden
         List<TypeScriptClass> potentialClasses = Index.getPropertiesToClasses().get(firstProperty);
+        CodeSmellLogger.info("Potential classes: " + potentialClasses);
         for (TypeScriptClass psiClass : potentialClasses) {
-            if (psiClass.getName() == null) continue;
+            CodeSmellLogger.info("Checking class " + psiClass.getQualifiedName());
+            if (!psiClass.isValid() || psiClass.getName() == null) continue;
+            CodeSmellLogger.info("Class is valid and not anonymous");
             if (PsiUtil.hasAll(psiClass, properties)) {
+                CodeSmellLogger.info("Class has all properties");
                 matchingClasses.add(psiClass);
             }
         }
@@ -684,32 +712,38 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // Überprüfung der Zuweisungen für jede Klasse
         for (TypeScriptClass psiClass : matchingClasses) {
+            CodeSmellLogger.info("Checking class " + psiClass.getQualifiedName());
             for (Property property : properties) {
+                CodeSmellLogger.info("Checking property " + property.getName());
                 PsiElement psiField = PsiUtil.getPsiField(psiClass, property);
+                CodeSmellLogger.info("PsiField: " + psiField);
+
+                TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+                if (constructor == null) {
+                    CodeSmellLogger.info("No constructor found");
+                    break;
+                }
 
                 // Referenzen des Properties überprüfen
                 for (PsiReference reference : ReferencesSearch.search(psiField)) {
-                    TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-                    if (constructor == null) {
-                        filteredClasses.remove(psiClass);
-                        break;
-                    }
+                    CodeSmellLogger.info("Checking reference " + reference.getElement().getText());
 
                     // Sicherstellen, dass die Referenz im Konstruktor liegt
                     if (PsiTreeUtil.getParentOfType(reference.getElement(), TypeScriptFunction.class) != constructor) {
-                        filteredClasses.remove(psiClass);
+                        CodeSmellLogger.info("Reference not in constructor");
                         break;
                     }
 
                     // Überprüfen, ob die Referenz in einer Zuweisung verwendet wird
                     JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
                     if (assignment == null || assignment.getLOperand().getFirstChild() != reference) {
-                        filteredClasses.remove(psiClass);
+                        CodeSmellLogger.info("Reference not in assignment or not on the left side");
                         break;
                     }
 
                     // Überprüfung des rechten Operanden der Zuweisung
                     if (!(assignment.getROperand() instanceof JSReferenceExpression)) {
+                        CodeSmellLogger.info("Right operand not a reference expression");
                         filteredClasses.remove(psiClass);
                         break;
                     }
@@ -717,6 +751,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     // Aufgelöste Property überprüfen
                     Property assignedProperty = PsiUtil.resolveProperty((JSReferenceExpression) assignment.getROperand());
                     if (assignedProperty == null) {
+                        CodeSmellLogger.info("No Assigned property not found");
                         filteredClasses.remove(psiClass);
                         break;
                     }
@@ -727,6 +762,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
                     Classfield definingField = definingParameter.get(assignedProperty);
                     if (definingField == null || !definingField.equals(property)) {
+                        CodeSmellLogger.info("Defining field not found or not equal to property");
                         filteredClasses.remove(psiClass);
                         break;
                     }

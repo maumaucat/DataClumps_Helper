@@ -1,5 +1,4 @@
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
@@ -15,7 +14,6 @@ import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
 import util.Index;
 import util.Property;
-import util.PsiUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -23,8 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
-
-import static com.intellij.codeInsight.intention.preview.IntentionPreviewUtils.getOriginalFile;
 
 
 public class DataClumpDialog extends DialogWrapper {
@@ -129,7 +125,7 @@ public class DataClumpDialog extends DialogWrapper {
         JLabel checkBoxLabel = new JLabel("Choose which parameters or fields should be extracted into the new class:");
         JPanel checkBoxPanel = new JPanel(new FlowLayout());
         for (Property property : matching) {
-            JCheckBox checkBox = new JCheckBox(property.getName() + ":" + property.getType());
+            JCheckBox checkBox = new JCheckBox(property.getName() + ":" + property.getTypes());
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
                 if (existingClassButton.isSelected()) {

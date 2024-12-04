@@ -206,16 +206,16 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
     private static boolean isOverridden(TypeScriptFunction function1, TypeScriptFunction function2) {
-        CodeSmellLogger.info("Checking if " + function1.getName() + " and " + function2.getName() + " are overridden.");
+        CodeSmellLogger.info("Checking if " + function1.getQualifiedName() + " and " + function2.getQualifiedName() + " are overridden.");
 
         JSClass class1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
         JSClass class2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
 
-        CodeSmellLogger.info("Class of " + function1.getName() + ": " + class1.getName());
-        CodeSmellLogger.info("Class of " + function2.getName() + ": " + class2.getName());
+        CodeSmellLogger.info("Class of " + function1.getName() + ": " + class1);
+        CodeSmellLogger.info("Class of " + function2.getName() + ": " + class2);
 
 
-        if (class1 == class2 || !function1.getName().equals(function2.getName())) return false;
+        if (class1 == null || class2 == null | class1 == class2 || !function1.getName().equals(function2.getName())) return false;
 
         List<JSClass> common = getCommonClassesInHierarchy(class1, class2);
         for (JSClass commonClass : common) {
