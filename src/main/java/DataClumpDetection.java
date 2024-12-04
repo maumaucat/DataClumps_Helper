@@ -1,5 +1,6 @@
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.psi.PsiElement;
 import util.*;
 import com.intellij.codeInspection.*;
@@ -37,28 +38,16 @@ public class DataClumpDetection extends LocalInspectionTool {
 
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
+                CodeSmellLogger.info("-------------------------------------------");
+                CodeSmellLogger.info("Visiting Class " + TypeScriptClass.getName());
+                CodeSmellLogger.info("-------------------------------------------");
 
-                if (!(TypeScriptClass instanceof TypeScriptClass)) {
-                    CodeSmellLogger.error("Unknown class type: " + TypeScriptClass.getClass(), new ClassCastException());
-                    return;
-                }
-
-                Index.updateClass((TypeScriptClass) TypeScriptClass);
+                Index.updateClass(TypeScriptClass);
                 if (PsiUtil.getFields(TypeScriptClass).size() >= MIN_DATACLUMPS) {
                     detectDataClumpForClass(TypeScriptClass, holder);
                 }
                 super.visitTypeScriptClass(TypeScriptClass);
             }
-
-
-            /*@Override
-            public void visitTypeScriptClass(@NotNull TypeScriptClass typeScriptClass) {
-                Index.updateClass(typeScriptClass);
-                if (PsiUtil.getFields(typeScriptClass).size() >= MIN_DATACLUMPS) {
-                    detectDataClumpForField(typeScriptClass, holder);
-                }
-                super.visitTypeScriptClass(typeScriptClass);
-            }*/
         };
     }
 
@@ -72,7 +61,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             // alle Klassen die eine passende Property haben
             for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(classfield)) {
                 if (otherClass == currentClass) continue;
-                if(!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
+                if (!otherClass.isValid()) continue; // TODO DELETE INVALID ENTRIES
 
 
                 List<Classfield> classfieldList = Index.getClassesToClassFields().get(otherClass);
@@ -99,14 +88,14 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
         }
 
-        HashMap<Classfield,PsiElement> currentFields = PsiUtil.getFieldsToElement(currentClass);
+        HashMap<Classfield, PsiElement> currentFields = PsiUtil.getFieldsToElement(currentClass);
 
         for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
 
             List<Classfield> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
-                for (Map.Entry<Classfield,PsiElement> entry : currentFields.entrySet()) {
-                    if (matchingFields.contains(entry.getKey())){
+                for (Map.Entry<Classfield, PsiElement> entry : currentFields.entrySet()) {
+                    if (matchingFields.contains(entry.getKey())) {
                         String otherClassName = "anonymous";
                         if (otherClass.getName() != null) {
                             otherClassName = otherClass.getName();
@@ -121,7 +110,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         for (TypeScriptFunction otherFunction : potentialFieldParameterDataClumps.keySet()) {
             List<Classfield> matchingFields = potentialFieldParameterDataClumps.get(otherFunction);
             if (matchingFields.size() >= MIN_DATACLUMPS) {
-                for (Map.Entry<Classfield,PsiElement> entry : currentFields.entrySet()) {
+                for (Map.Entry<Classfield, PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())) {
                         holder.registerProblem(entry.getValue(), "Data Clump with Function " + otherFunction.getName() +
                                 ". Identified Fields: " + matchingFields + ".", new DataClumpRefactoring(currentClass, otherFunction, new ArrayList<>(matchingFields)));
@@ -184,8 +173,8 @@ public class DataClumpDetection extends LocalInspectionTool {
                                         + matchingParameter + ".",
                                 new DataClumpRefactoring(currentFunction, otherClass, new ArrayList<>(matchingParameter)));
                     }
-                }
             }
+        }
 
         for (TypeScriptFunction otherFunction : potentialParameterParameterDataClumps.keySet()) {
             List<Parameter> matchingParameter = potentialParameterParameterDataClumps.get(otherFunction);
@@ -204,40 +193,79 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     private static boolean checkClassFunctionPair(TypeScriptFunction function, TypeScriptClass TypeScriptClass) {
         TypeScriptClass functionClass = PsiTreeUtil.getParentOfType(function, TypeScriptClass.class);
-         boolean valid = function.isValid() && TypeScriptClass.isValid();
-         boolean SameHierarchy = inSameHierarchy(functionClass, TypeScriptClass);
+        return function.isValid() && TypeScriptClass.isValid()
+                && !inSameHierarchy(functionClass, TypeScriptClass);
 
-        return valid && !SameHierarchy;
     }
 
     private static boolean checkFunctions(TypeScriptFunction function1, TypeScriptFunction function2) {
+
+        return function1.isValid() && function2.isValid()
+                && function1 != function2
+                && !isOverridden(function1, function2);
+    }
+
+    private static boolean isOverridden(TypeScriptFunction function1, TypeScriptFunction function2) {
         TypeScriptClass class1 = PsiTreeUtil.getParentOfType(function1, TypeScriptClass.class);
         TypeScriptClass class2 = PsiTreeUtil.getParentOfType(function2, TypeScriptClass.class);
 
 
-        boolean valid = function1.isValid() && function2.isValid();
-        boolean isDifferent = function1 != function2;
-        boolean isOverridden = class1 != class2 && function1.getName().equals(function2.getName())
-                && inSameHierarchy(class1, class2);
+        if (class1 == class2 || !function1.getName().equals(function2.getName())) return false;
 
+        List<TypeScriptClass> common = getCommonClassesInHierarchy(class1, class2);
+        for (TypeScriptClass commonClass : common) {
+            if (commonClass.findFunctionByName(function1.getName()) != null) {
+                return true;
+            }
+        }
+        return false;
 
-        return valid && isDifferent && !isOverridden;
     }
 
+
     private static boolean inSameHierarchy(TypeScriptClass class1, TypeScriptClass class2) {
-        if (class1 == null || class2 == null) return false;
+        return !getCommonClassesInHierarchy(class1, class2).isEmpty();
+    }
+
+    private static List<TypeScriptClass> getCommonClassesInHierarchy(TypeScriptClass class1, TypeScriptClass class2) {
+        if (class1 == null || class2 == null) return new ArrayList<>();
 
         CodeSmellLogger.info("Checking if " + class1.getName() + " and " + class2.getName() + " are in the same hierarchy.");
 
-        CodeSmellLogger.info("Class1 " + class1.getText());
-        CodeSmellLogger.info("Class2 " + class2.getText());
+        List<TypeScriptClass> superClasses1 = resolveHierarchy(class1);
+        List<TypeScriptClass> superClasses2 = resolveHierarchy(class2);
 
-        CodeSmellLogger.info("Superclasses of " + class1.getName() + ": " + Index.getSuperClasses().get(class1));
-        CodeSmellLogger.info("Superclasses of " + class2.getName() + ": " + Index.getSuperClasses().get(class2));
+        CodeSmellLogger.info("Superclasses of " + class1.getName() + ": " + superClasses1);
+        CodeSmellLogger.info("Superclasses of " + class2.getName() + ": " + superClasses2);
 
-        List<TypeScriptClass> list1 = Index.getSuperClasses().get(class1);
-        List<TypeScriptClass> list2 = Index.getSuperClasses().get(class2);
+        superClasses1.retainAll(superClasses2);
 
-        return !Collections.disjoint(list1 , list2);
+        CodeSmellLogger.info("Common Superclasses: " + superClasses1);
+        return superClasses1;
+    }
+
+
+    private static List<TypeScriptClass> resolveHierarchy(TypeScriptClass tsClass) {
+
+        List<TypeScriptClass> superClasses = new ArrayList<>();
+        superClasses.add(tsClass);
+
+        for (JSClass psiClass : tsClass.getSuperClasses()) {
+            if (!(psiClass instanceof TypeScriptClass)) {
+                CodeSmellLogger.warn("Superclass is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
+            } else {
+                superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
+            }
+        }
+
+        for (JSClass psiClass : tsClass.getImplementedInterfaces()) {
+            if (!(psiClass instanceof TypeScriptClass)) {
+                CodeSmellLogger.warn("Interface is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
+            } else {
+                superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
+            }
+        }
+
+        return superClasses;
     }
 }

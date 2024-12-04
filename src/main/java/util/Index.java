@@ -28,8 +28,6 @@ public class Index {
 
     private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
 
-    private static HashMap<TypeScriptClass, List<TypeScriptClass>> superClasses;
-
     public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
     }
@@ -48,10 +46,6 @@ public class Index {
 
     public static HashMap<TypeScriptFunction, List<Parameter>> getFunctionsToParameters() {
         return functionsToParameters;
-    }
-
-    public static HashMap<TypeScriptClass, List<TypeScriptClass>> getSuperClasses() {
-        return superClasses;
     }
 
     private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
@@ -79,8 +73,6 @@ public class Index {
         if (psiClass.getQualifiedName() != null) {
             qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
         }
-
-        superClasses.put(psiClass, resolveHierarchy(psiClass));
 
         classesToClassFields.put(psiClass, new ArrayList<>());
         List<Classfield> classfields = PsiUtil.getFields(psiClass);
@@ -141,8 +133,6 @@ public class Index {
             qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
         }
 
-        superClasses.put(psiClass, resolveHierarchy(psiClass));
-
         // alle aktuellen Klassenfelder der Klasse speichern
         List<Classfield> new_Fields = PsiUtil.getFields(psiClass);
 
@@ -196,7 +186,6 @@ public class Index {
         classesToClassFields = new HashMap<>();
         functionsToParameters = new HashMap<>();
         qualifiedNamesToClasses = new HashMap<>();
-        superClasses = new HashMap<>();
 
         CodeSmellLogger.info("Building index...");
 
@@ -231,7 +220,6 @@ public class Index {
         printParametersToFunctions();
         printClassesToClassFields();
         printFunctionsToParameter();
-        printSuperClasses();
 
     }
 
@@ -298,34 +286,6 @@ public class Index {
                 }
             }
         });
-    }
-
-    public static void printSuperClasses() {
-        ApplicationManager.getApplication().runReadAction(() -> {
-            CodeSmellLogger.info("SuperClasses: ");
-            for (TypeScriptClass clazz : superClasses.keySet()) {
-                if (clazz.getName() != null) {
-                    CodeSmellLogger.info(clazz.getName() + " : " + superClasses.get(clazz));
-                } else {
-                    CodeSmellLogger.info("anonymous : " + superClasses.get(clazz));
-                }
-            }
-        });
-    }
-
-    private static List<TypeScriptClass> resolveHierarchy(TypeScriptClass tsClass) {
-
-        List<TypeScriptClass> superClasses = new ArrayList<>();
-        superClasses.add(tsClass);
-
-        for (JSClass psiClass : tsClass.getSuperClasses()) {
-            if (!(psiClass instanceof TypeScriptClass)) {
-                CodeSmellLogger.warn("Superclass is not a TypeScriptClass: " + psiClass.getText() + ". Type : " + psiClass.getClass());
-            };
-            superClasses.addAll(resolveHierarchy((TypeScriptClass) psiClass));
-        }
-
-        return superClasses;
     }
 
 }
