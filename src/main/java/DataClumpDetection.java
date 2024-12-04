@@ -227,7 +227,6 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     }
 
-
     private static boolean inSameHierarchy(TypeScriptClass class1, TypeScriptClass class2) {
         return !getCommonClassesInHierarchy(class1, class2).isEmpty();
     }
