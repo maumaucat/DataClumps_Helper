@@ -450,7 +450,13 @@ public class PsiUtil {
                 if (property instanceof Classfield) {
                     List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
-                        constructorCode.append(modifier + " ");
+                        if (modifier.equals("abstract")) {
+                            CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
+                        } else if (modifier.equals("declare")) {
+                            CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
+                        } else {
+                            constructorCode.append(modifier + " ");
+                        }
                     }
                     // If the property is public, do not use the underscore prefix
                     if (modifiers.contains("public")) {

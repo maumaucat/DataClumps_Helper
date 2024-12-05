@@ -642,13 +642,19 @@ public class DataClumpRefactoring implements LocalQuickFix {
         CodeSmellLogger.info("Extracting class...");
 
         // filter all abstract fields
-        List<Property> nonAbstractfields = fields.stream().filter(property -> !(property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract"))).toList();
         List<Property> abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")).toList();
+        List<Property> declaredFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("declare")).toList();
 
+        List<Property> constructorFields = new ArrayList<>(fields);
+        constructorFields.removeAll(abstractFields);
+        constructorFields.removeAll(declaredFields);
+
+        abstractFields.forEach(optionalFields::remove);
+        declaredFields.forEach(optionalFields::remove);
 
         TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty());
 
-        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, nonAbstractfields, optionalFields, new ArrayList<>(), null);
+        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null);
         PsiUtil.addFunctionToClass(psiClass, constructor);
 
         // add abstract fields
@@ -656,7 +662,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
             ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield)field).getModifier(), false, null);
             PsiUtil.addFieldToClass(psiClass, abstractField);
         }
-
+        // add declared fields
+        for (Property field : declaredFields) {
+            ES6FieldStatementImpl declaredField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield)field).getModifier(), false, null);
+            PsiUtil.addFieldToClass(psiClass, declaredField);
+        }
 
         // Getter and Setter
         for (Property field : fields) {
