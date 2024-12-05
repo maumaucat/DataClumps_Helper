@@ -7,15 +7,12 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
-import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.sql.dataFlow.instructions.SqlPseudoValueSource;
-import io.ktor.util.Hash;
 import org.jetbrains.annotations.NotNull;
 import util.*;
 
@@ -163,6 +160,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
             }
 
             for (Property property : matchingProperties) {
+                if (property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")) continue;
+
                 CodeSmellLogger.info("Checking property of list " + property.getName());
                 // not defined in constructor
                 if (!definedClassfields.containsKey(property)) {
@@ -172,13 +171,17 @@ public class DataClumpRefactoring implements LocalQuickFix {
                 }
             }
 
+            List<Property> allProperties = new ArrayList<>(constructorFields);
+            allProperties.addAll(constructorParameter);
+
+            optionalProperties.retainAll(allProperties);
+
             for (Property optionalProperty : optionalProperties) {
                 PsiElement field = PsiUtil.getPsiField(psiClass, optionalProperty);
                 if (field instanceof TypeScriptField) {
                     PsiUtil.makeFieldOptional((TypeScriptField) field);
                 }
             }
-
 
             JSBlockStatement body = constructor.getBlock();
 
@@ -355,38 +358,28 @@ public class DataClumpRefactoring implements LocalQuickFix {
         String fieldName = extractedClass.getName().toLowerCase();
 
         // Neues Feld hinzufügen
-        addNewFieldToClass(psiClass, extractedClass, fieldName, defaultValues);
+        ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
+                psiClass, fieldName, extractedClass.getJSType().getTypeText(), List.of("public"), false, getDefaultInit(psiClass, extractedClass, defaultValues)
+        );
+        PsiUtil.addFieldToClass(psiClass, newFieldStatement);
+        CodeSmellLogger.info("Field " + newFieldStatement.getText() + " added to class " + psiClass.getQualifiedName());
 
         // Field-Usages aktualisieren
         updateFieldReferences(psiClass, properties, fieldName);
+        CodeSmellLogger.info("Field references updated.");
 
 
         // Konstruktor aktualisieren
         updateConstructor(psiClass, properties, extractedClass, fieldName, definedClassfields, defaultValues);
+        CodeSmellLogger.info("Constructor updated.");
 
-
-
-        CodeSmellLogger.info("Class refactord.");
+        CodeSmellLogger.info("Class refactored.");
     }
 
-    private void addNewFieldToClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, String> defaultValues) {
 
-        ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
-                psiClass, fieldName, extractedClass.getJSType(), List.of("public"), false, getDefaultInit(extractedClass, defaultValues)
-        );
+    private String getDefaultInit(TypeScriptClass psiClass, TypeScriptClass extractedClass, HashMap<Classfield, String> defaultValues) {
 
-        PsiElement[] existingFields = psiClass.getFields();
-        PsiElement insertPosition = (existingFields.length > 0)
-                ? PsiTreeUtil.getParentOfType(existingFields[existingFields.length - 1], ES6FieldStatementImpl.class)
-                : PsiTreeUtil.getChildOfType(psiClass, TypeScriptFunction.class);
-
-        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
-            psiClass.addBefore(newFieldStatement, insertPosition);
-        });
-
-    }
-
-    private String getDefaultInit(TypeScriptClass extractedClass, HashMap<Classfield, String> defaultValues) {
+        if (psiClass.getConstructor() != null) return null;
 
         List<Property> extractedParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
 
@@ -411,7 +404,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         return init.toString();
     }
-
 
     private void updateConstructor(TypeScriptClass psiClass, List<Property> properties, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, TypeScriptParameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
@@ -649,10 +641,22 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields, Set<Property> optionalFields) {
         CodeSmellLogger.info("Extracting class...");
 
-        TypeScriptClass psiClass = PsiUtil.createClass(dir, className);
+        // filter all abstract fields
+        List<Property> nonAbstractfields = fields.stream().filter(property -> !(property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract"))).toList();
+        List<Property> abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")).toList();
 
-        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, fields, optionalFields, new ArrayList<>(), null);
+
+        TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty());
+
+        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, nonAbstractfields, optionalFields, new ArrayList<>(), null);
         PsiUtil.addFunctionToClass(psiClass, constructor);
+
+        // add abstract fields
+        for (Property field : abstractFields) {
+            ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield)field).getModifier(), false, null);
+            PsiUtil.addFieldToClass(psiClass, abstractField);
+        }
+
 
         // Getter and Setter
         for (Property field : fields) {

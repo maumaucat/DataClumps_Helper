@@ -38,10 +38,6 @@ public class DataClumpDetection extends LocalInspectionTool {
 
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
-                CodeSmellLogger.info("-------------------------------------------");
-                CodeSmellLogger.info("Visiting Class " + TypeScriptClass.getName());
-                CodeSmellLogger.info("-------------------------------------------");
-
                 Index.updateClass(TypeScriptClass);
                 if (PsiUtil.getFields(TypeScriptClass).size() >= MIN_DATACLUMPS) {
                     detectDataClumpForClass(TypeScriptClass, holder);
@@ -206,14 +202,8 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
     private static boolean isOverridden(TypeScriptFunction function1, TypeScriptFunction function2) {
-        CodeSmellLogger.info("Checking if " + function1.getQualifiedName() + " and " + function2.getQualifiedName() + " are overridden.");
-
         JSClass class1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
         JSClass class2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
-
-        CodeSmellLogger.info("Class of " + function1.getName() + ": " + class1);
-        CodeSmellLogger.info("Class of " + function2.getName() + ": " + class2);
-
 
         if (class1 == null || class2 == null | class1 == class2 || !function1.getName().equals(function2.getName())) return false;
 
@@ -234,17 +224,11 @@ public class DataClumpDetection extends LocalInspectionTool {
     private static List<JSClass> getCommonClassesInHierarchy(JSClass class1, JSClass class2) {
         if (class1 == null || class2 == null) return new ArrayList<>();
 
-        CodeSmellLogger.info("Checking if " + class1.getName() + " and " + class2.getName() + " are in the same hierarchy.");
-
         List<JSClass> superClasses1 = resolveHierarchy(class1);
         List<JSClass> superClasses2 = resolveHierarchy(class2);
 
-        CodeSmellLogger.info("Superclasses of " + class1.getName() + ": " + superClasses1);
-        CodeSmellLogger.info("Superclasses of " + class2.getName() + ": " + superClasses2);
-
         superClasses1.retainAll(superClasses2);
 
-        CodeSmellLogger.info("Common Superclasses: " + superClasses1);
         return superClasses1;
     }
 

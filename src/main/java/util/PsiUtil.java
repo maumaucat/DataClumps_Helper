@@ -14,23 +14,20 @@ import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.rename.RenameProcessor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 
 public class PsiUtil {
 
-    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, JSType type, List<String> modifiers, boolean optional, String defaultValue) {
+    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, List<String> modifiers, boolean optional, String defaultValue) {
         StringBuilder fieldText = new StringBuilder();
         for (String modifier : modifiers) {
             fieldText.append(modifier + " ");
         }
         if (optional) {
-            fieldText.append(name + "?: " + type.getTypeText());
+            fieldText.append(name + "?: " + type);
         } else {
-            fieldText.append(name + " : " + type.getTypeText());
+            fieldText.append(name + " : " + type);
         }
         if (defaultValue != null) {
             fieldText.append(" = " + defaultValue);
@@ -47,6 +44,31 @@ public class PsiUtil {
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         return PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
+    }
+
+    public static void addFieldToClass(TypeScriptClass psiClass, ES6FieldStatementImpl field) {
+
+        // Add the field to the correct position
+        PsiElement insertBefore;
+        ES6FieldStatementImpl firstField = PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
+        if (firstField != null) {
+            insertBefore = firstField;
+        } else if (psiClass.getFunctions().length > 0) {
+            CodeSmellLogger.info("Class has functions, inserting before the first one.");
+            insertBefore = psiClass.getFunctions()[0];
+        } else {
+            CodeSmellLogger.info("Class has no functions, inserting at the end.");
+            insertBefore =  psiClass.getLastChild();
+        }
+
+        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+
+            psiClass.addBefore(field, insertBefore);
+
+            // Reformat the class
+            CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
+        });
+
     }
 
     public static TypeScriptParameter createTypeScriptParameter(PsiElement context, String name, JSType type) {
@@ -179,7 +201,7 @@ public class PsiUtil {
         JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
         String defaultValue = initializer != null ? initializer.getText() : null;
         WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
-            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType(), getModifiers(field), true, defaultValue));
+            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType().getTypeText(), getModifiers(field), true, defaultValue));
         });
     }
 
@@ -376,8 +398,12 @@ public class PsiUtil {
         return (TypeScriptFunction) psiClass.getFunctions()[0];
     }
 
-    public static TypeScriptClass createClass(PsiElement context, String className) {
-        String classText = "class " + className + " {}";
+    public static TypeScriptClass createClass(PsiElement context, String className, boolean abstractClass) {
+        StringBuilder classText = new StringBuilder();
+        if (abstractClass) {
+            classText.append("abstract ");
+        }
+        classText.append("class " + className + " {\n}\n");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classText);
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
@@ -400,9 +426,12 @@ public class PsiUtil {
 
         StringBuilder constructorCode = new StringBuilder();
 
-        List<Property> requiredProperties = new ArrayList<>(allFields);
-        requiredProperties.addAll(allParameters);
+        List<Property> allProperties = new ArrayList<>(allFields);
+        allProperties.addAll(allParameters);
+
+        List<Property> requiredProperties = new ArrayList<>(allProperties);
         requiredProperties.removeAll(optional);
+
 
         CodeSmellLogger.info("Required Properties: " + requiredProperties);
         CodeSmellLogger.info("Optional: " + optional);
