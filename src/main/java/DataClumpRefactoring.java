@@ -355,7 +355,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties, HashMap<Classfield, TypeScriptParameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
         CodeSmellLogger.info("Refactoring class " + psiClass.getQualifiedName() + "...");
 
-        String fieldName = extractedClass.getName().toLowerCase();
+        String fieldName =  "my_" + extractedClass.getName().toLowerCase();
 
         // Neues Feld hinzufügen
         ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
@@ -372,6 +372,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         // Konstruktor aktualisieren
         updateConstructor(psiClass, properties, extractedClass, fieldName, definedClassfields, defaultValues);
         CodeSmellLogger.info("Constructor updated.");
+
 
         CodeSmellLogger.info("Class refactored.");
     }
@@ -419,6 +420,25 @@ public class DataClumpRefactoring implements LocalQuickFix {
             constructor.getBlock().addAfter(initialization, constructor.getBlock().getFirstChild());
         });
 
+        List<JSAssignmentExpression> markedForRemoval = new ArrayList<>();
+
+        // remove all assignments of the form this.person.name = this.person.name
+        constructor.getBlock().accept(new JSRecursiveWalkingElementVisitor() {
+            @Override
+            public void visitJSAssignmentExpression(@NotNull JSAssignmentExpression node) {
+                super.visitJSAssignmentExpression(node);
+                CodeSmellLogger.info("Checking assignment " + node.getText());
+                if (node.getLOperand().getText().equals(node.getROperand().getText())) {
+                    CodeSmellLogger.info("Removing assignment " + node.getText());
+                    markedForRemoval.add(node);
+                }
+            }
+        });
+
+        for (JSAssignmentExpression assignment : markedForRemoval) {
+            WriteCommandAction.runWriteCommandAction(psiClass.getProject(), assignment.getParent()::delete);
+        }
+
     }
 
     private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
@@ -457,7 +477,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
         } else {
             expressionText = assignment.getLOperand().getFirstChild().getFirstChild().getText() + "." + fieldName + "." + propertyName + " = " + assignment.getROperand().getText();
         }
-
         JSExpression newExpression = JSPsiElementFactory.createJSExpression(expressionText, assignment);
         WriteCommandAction.runWriteCommandAction(assignment.getProject(), () -> {
             assignment.replace(newExpression);

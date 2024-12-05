@@ -1,4 +1,5 @@
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
@@ -224,14 +225,16 @@ public class DataClumpDialog extends DialogWrapper {
             // make sure no class with same name already in dir
             for (PsiFile file : directory.getFiles()) {
                 if (file.getName().endsWith(".ts")) {
-                    List<TypeScriptClass> classes = PsiTreeUtil.getChildrenOfTypeAsList(file, TypeScriptClass.class);
-                    for (TypeScriptClass psiClass : classes) {
+                    List<JSClass> classes = PsiTreeUtil.getChildrenOfTypeAsList(file, JSClass.class);
+                    for (JSClass psiClass : classes) {
                         if (psiClass.getName().equals(className)) {
                             return new ValidationInfo("Class " + className + " already exists in directory " + directory.getName(), newClassNameField);
                         }
                     }
                 }
             }
+            // TODO make sure also no variable with same name exists?
+
         } else {
             TypeScriptClass selectedClass = getSelectedClass();
             if (selectedClass == null) {
