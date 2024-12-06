@@ -8,6 +8,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
@@ -569,21 +570,33 @@ public class PsiUtil {
         return text.substring(1, text.length() - 1);
     }
 
-    public static void makeClassExported(TypeScriptClass psiClass) {
-        if (psiClass.isExported()) return;
-        PsiElement export = JSElementFactory.createExpressionCodeFragment(psiClass.getProject(), "export ", psiClass);
-        // Get the first child or a suitable location within the class to insert the export statement
-        PsiElement firstChild = psiClass.getFirstChild();
+    public static TypeScriptClass makeClassExported(TypeScriptClass psiClass) {
+        if (psiClass.isExported()) return psiClass;
+
+
+        PsiDirectory dir = psiClass.getContainingFile().getContainingDirectory();
+        String className = psiClass.getName();
+
+        StringBuilder classCode = new StringBuilder();
+        classCode.append("export ");
+        classCode.append(psiClass.getText());
+
+        CodeSmellLogger.info(classCode.toString());
+
+        PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        TypeScriptClass newClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
-            if (firstChild != null) {
-                // Add the export statement before the first child of the class
-                psiClass.addBefore(export, firstChild);
-            } else {
-               CodeSmellLogger.error("Could not find a suitable location to insert the export statement", new IllegalArgumentException());
-            }
+            psiClass.replace(newClass);
+            CodeStyleManager.getInstance(newClass.getProject()).reformat(newClass);
         });
 
+        // this is for some reason necessary to get the virtual file later on
+        VirtualFile virtualFile = dir.getVirtualFile().findChild(className + ".ts");
+        PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
+        TypeScriptClass newClassWithVirtualFile = PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
+
+        return newClassWithVirtualFile;
     }
 
     public static String getRelativePath(PsiFile from, PsiFile to) {

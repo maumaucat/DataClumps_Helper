@@ -1,3 +1,4 @@
+import com.intellij.lang.ecmascript6.psi.ES6ImportDeclaration;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
@@ -13,6 +14,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
+import util.CodeSmellLogger;
 import util.Index;
 import util.Property;
 
@@ -39,13 +41,15 @@ public class DataClumpDialog extends DialogWrapper {
 
     private Project project;
     private PsiElement current;
+    private PsiElement other;
 
 
-    public DataClumpDialog(List<Property> matching, PsiElement current) {
+    public DataClumpDialog(List<Property> matching, PsiElement current, PsiElement other) {
         super(true);
         this.project = current.getProject();
         this.matching = matching;
         this.current = current;
+        this.other = other;
         setTitle("Data Clump Refactoring");
         init();
     }
@@ -233,6 +237,15 @@ public class DataClumpDialog extends DialogWrapper {
                     }
                 }
             }
+
+            if (isImported(className, current.getContainingFile())) {
+                return new ValidationInfo("Class " + className + " is already imported ", newClassNameField);
+            }
+
+            if (isImported(className, other.getContainingFile())) {
+                return new ValidationInfo("Class " + className + " is already imported ", newClassNameField);
+            }
+
             // TODO make sure also no variable with same name exists?
 
         } else {
@@ -247,6 +260,16 @@ public class DataClumpDialog extends DialogWrapper {
             return new ValidationInfo("Not enough parameter or fields selected", (JComponent) this.checkBoxPanel.getComponents()[0]);
         }
         return super.doValidate();
+    }
+
+    private boolean isImported(String className, PsiFile file) {
+
+        for (ES6ImportDeclaration importStatement : PsiTreeUtil.findChildrenOfType(file, ES6ImportDeclaration.class)) {
+            if (importStatement.getNamedImports() != null && importStatement.getNamedImports().getText().contains(className)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String getClassName() {

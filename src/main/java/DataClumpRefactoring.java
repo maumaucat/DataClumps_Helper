@@ -59,7 +59,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
 
-        DataClumpDialog dialog = new DataClumpDialog(matchingProperties, currentElement);
+        DataClumpDialog dialog = new DataClumpDialog(matchingProperties, currentElement, otherElement);
 
         if (!dialog.showAndGet()) return;
 
@@ -100,7 +100,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (extractedClass.getConstructor() != null) {
                 originalParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
             }
-            PsiUtil.makeClassExported(extractedClass);
+            extractedClass = PsiUtil.makeClassExported(extractedClass);
             adjustConstructor(extractedClass, selectedProperties, optional);
             addGetterAndSetter(extractedClass, selectedProperties, optional);
             // refactor calls to the constructor
@@ -365,6 +365,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
         PsiFile elementFile = element.getContainingFile();
         PsiFile extractedFile = extractedClass.getContainingFile();
 
+        if (elementFile.equals(extractedFile)) return;
+
         //check that there is not already an import statement for the extracted class
         for (ES6ImportDeclaration importStatement : PsiTreeUtil.findChildrenOfType(elementFile, ES6ImportDeclaration.class)) {
             //TODO deal with other imports properly
@@ -373,7 +375,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
             }
         }
 
-        if (elementFile.equals(extractedFile)) return;
         String relativePath = PsiUtil.getRelativePath(elementFile, extractedFile);
         String importStatement = "import { " + extractedClass.getName() + " } from '" + relativePath + "';\n";
         PsiElement firstChild = elementFile.getFirstChild();
