@@ -1,15 +1,19 @@
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.util.IntentionFamilyName;
+import com.intellij.lang.ecmascript6.psi.ES6ImportDeclaration;
+import com.intellij.lang.ecmascript6.psi.ES6ImportSpecifier;
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.psi.*;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSImportStatement;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -96,6 +100,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (extractedClass.getConstructor() != null) {
                 originalParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
             }
+            PsiUtil.makeClassExported(extractedClass);
             adjustConstructor(extractedClass, selectedProperties, optional);
             addGetterAndSetter(extractedClass, selectedProperties, optional);
             // refactor calls to the constructor
@@ -345,11 +350,37 @@ public class DataClumpRefactoring implements LocalQuickFix {
     }
 
     private void refactorElement(PsiElement element, TypeScriptClass extractedClass, List<Property> properties, HashMap<Classfield, TypeScriptParameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
+
+        addImport(element, extractedClass);
+
+
         if (element instanceof TypeScriptClass && !element.equals(extractedClass)) {
             refactorClass((TypeScriptClass) element, extractedClass, properties, definedClassfields, defaultValues);
         } else if (element instanceof TypeScriptFunction) {
             refactorFunction((TypeScriptFunction) element, extractedClass, properties);
         }
+    }
+
+    private void addImport(PsiElement element, TypeScriptClass extractedClass) {
+        PsiFile elementFile = element.getContainingFile();
+        PsiFile extractedFile = extractedClass.getContainingFile();
+
+        //check that there is not already an import statement for the extracted class
+        for (ES6ImportDeclaration importStatement : PsiTreeUtil.findChildrenOfType(elementFile, ES6ImportDeclaration.class)) {
+            //TODO deal with other imports properly
+            if (importStatement.getNamedImports() != null && importStatement.getNamedImports().getText().contains(extractedClass.getName())) {
+                return;
+            }
+        }
+
+        if (elementFile.equals(extractedFile)) return;
+        String relativePath = PsiUtil.getRelativePath(elementFile, extractedFile);
+        String importStatement = "import { " + extractedClass.getName() + " } from '" + relativePath + "';\n";
+        PsiElement firstChild = elementFile.getFirstChild();
+        WriteCommandAction.runWriteCommandAction(element.getProject(), () -> {
+            elementFile.addBefore(JSElementFactory.createExpressionCodeFragment(element.getProject(), importStatement, elementFile), firstChild);
+        });
+
     }
 
     private void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties, HashMap<Classfield, TypeScriptParameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
@@ -376,7 +407,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         CodeSmellLogger.info("Class refactored.");
     }
-
 
     private String getDefaultInit(TypeScriptClass psiClass, TypeScriptClass extractedClass, HashMap<Classfield, String> defaultValues) {
 
@@ -671,7 +701,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         abstractFields.forEach(optionalFields::remove);
         declaredFields.forEach(optionalFields::remove);
 
-        TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty());
+        TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty(), true);
 
         TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null);
         PsiUtil.addFunctionToClass(psiClass, constructor);
@@ -711,8 +741,14 @@ public class DataClumpRefactoring implements LocalQuickFix {
             dir.add(file);
         });
 
+        // this is for some reason necessary to get the virtual file later on
+        VirtualFile virtualFile = dir.getVirtualFile().findChild(className + ".ts");
+        PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
+        TypeScriptClass extractedClass = PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
+
+
         CodeSmellLogger.info("Class extracted.");
-        return psiClass;
+        return extractedClass;
     }
 
     public static Set<TypeScriptClass> getUsableClasses(List<Property> properties) {

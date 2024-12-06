@@ -14,6 +14,8 @@ import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.rename.RenameProcessor;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 
@@ -398,8 +400,11 @@ public class PsiUtil {
         return (TypeScriptFunction) psiClass.getFunctions()[0];
     }
 
-    public static TypeScriptClass createClass(PsiElement context, String className, boolean abstractClass) {
+    public static TypeScriptClass createClass(PsiElement context, String className, boolean abstractClass, boolean export) {
         StringBuilder classText = new StringBuilder();
+        if (export) {
+            classText.append("export ");
+        }
         if (abstractClass) {
             classText.append("abstract ");
         }
@@ -562,6 +567,41 @@ public class PsiUtil {
     public static String removeBrackets(String text) {
         text = text.trim();
         return text.substring(1, text.length() - 1);
+    }
+
+    public static void makeClassExported(TypeScriptClass psiClass) {
+        if (psiClass.isExported()) return;
+        PsiElement export = JSElementFactory.createExpressionCodeFragment(psiClass.getProject(), "export ", psiClass);
+        // Get the first child or a suitable location within the class to insert the export statement
+        PsiElement firstChild = psiClass.getFirstChild();
+
+        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+            if (firstChild != null) {
+                // Add the export statement before the first child of the class
+                psiClass.addBefore(export, firstChild);
+            } else {
+               CodeSmellLogger.error("Could not find a suitable location to insert the export statement", new IllegalArgumentException());
+            }
+        });
+
+    }
+
+    public static String getRelativePath(PsiFile from, PsiFile to) {
+        String fromPathString = from.getVirtualFile().getPath();
+        String toPathString = to.getVirtualFile().getPath();
+
+        // Umwandeln der Pfade in Path-Objekte
+        Path fromPath = Paths.get(fromPathString);
+        Path toPath = Paths.get(toPathString);
+
+        // Berechne den relativen Pfad
+        Path relativePath = fromPath.relativize(toPath);
+
+        // Entferne den Dateinamen (Endung) und ersetze Backslashes durch Slashes
+        String relativePathString = relativePath.toString();
+
+
+        return "./" + relativePathString.replace("\\", "/").substring(3, relativePathString.length()-3);
     }
 
 }
