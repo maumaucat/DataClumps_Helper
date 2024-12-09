@@ -21,8 +21,11 @@ public class DataClumpSettingsUI {
         Integer[] options = {2, 3, 4, 5, 6, 7, 8, 9, 10};
         numberOfProperties = new ComboBox<>(options);
         numberOfProperties.setSelectedItem(DataClumpSettings.getInstance().getState().minNumberOfProperties);
-        includeModifiersInExtractedClass.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
         includeModifiersInDetection.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInDetection);
+        includeModifiersInExtractedClass.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
+        if (!includeModifiersInDetection.isSelected()) {
+            includeModifiersInExtractedClass.setEnabled(false);
+        }
 
         mainPanel = FormBuilder.createFormBuilder()
                 .addComponent(new JBLabel("Settings for data clump detection: "))
