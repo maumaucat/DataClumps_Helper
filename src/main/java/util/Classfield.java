@@ -30,16 +30,16 @@ public class Classfield extends Property {
 
     @Override
     public String toString() {
-        return "[ClassField: name=" + this.getName() + ", type=" + this.getTypes() + ", modifiers=" + this.getModifier() + "]";
+        return this.name;
     }
 
     public boolean matches(Classfield field){
         if (DataClumpSettings.getInstance().getState().includeModifiersInDetection) {
-            return this.getName().equals(field.getName())
-                    && this.getTypes().equals(field.getTypes())
-                    && this.getModifier().equals(field.getModifier());
+            return this.name.equals(field.name)
+                    && this.types.equals(field.types)
+                    && this.modifier.equals(field.modifier);
         }
         return this.getName().equals(field.getName())
-                && this.getTypes().equals(field.getTypes());
+                && this.types.equals(field.types);
     }
 }

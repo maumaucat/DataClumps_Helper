@@ -7,6 +7,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
@@ -21,6 +22,15 @@ import java.util.*;
 
 
 public class PsiUtil {
+
+    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Parameter parameter) {
+        for (JSParameterListElement psiParameter : function.getParameters()) {
+            if (parameter.equals(new Parameter((TypeScriptParameter) psiParameter))) {
+                return (TypeScriptParameter) psiParameter;
+            }
+        }
+        return null;
+    }
 
     public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, List<String> modifiers, boolean optional, String defaultValue) {
         StringBuilder fieldText = new StringBuilder();
@@ -180,7 +190,7 @@ public class PsiUtil {
         return null;
     }
 
-    public static PsiElement getPsiField(TypeScriptClass psiClass, Property property) {
+    public static PsiElement getPsiField(JSClass psiClass, Property property) {
         HashMap<Classfield, PsiElement> fields = getFieldsToElement(psiClass);
         return fields.get(property);
     }
@@ -338,13 +348,23 @@ public class PsiUtil {
         return null;
     }
 
-    public static HashMap<Classfield, PsiElement> getFieldsToElement(TypeScriptClass psiClass) {
+    public static String getQualifiedName(PsiElement element) {
+        String name = "anonymous";
+        if (element instanceof TypeScriptField field) {
+            return field.getQualifiedName();
+        }
+        if (element instanceof TypeScriptParameter parameter) {
+            return parameter.getQualifiedName();
+        }
+        return null;
+    }
+
+    public static HashMap<Classfield, PsiElement> getFieldsToElement(JSClass psiClass) {
         HashMap<Classfield, PsiElement> fields = new HashMap<>();
         // iterate all FieldStatements
         for (JSField field : psiClass.getFields()) {
             if (field.getName() == null || field.getJSType() == null) continue;
             fields.put(new Classfield((TypeScriptField) field), field);
-
         }
         // iterate constructor Parameter
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();

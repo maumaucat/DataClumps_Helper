@@ -3,7 +3,6 @@ import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.*;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
-import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -177,6 +176,28 @@ public class Index {
             classList.add(psiClass);
             propertiesToClasses.put(classField, classList);
         }
+    }
+
+    public static void removeElement(PsiElement element) {
+
+        if (element instanceof TypeScriptFunction psiFunction) {
+            functionsToParameters.remove(psiFunction);
+            for (Parameter parameter : getParameters(psiFunction)) {
+                propertiesToFunctions.get(parameter).remove(psiFunction);
+            }
+            functionsToParameters.remove(psiFunction);
+        }
+
+        if (element instanceof TypeScriptClass psiClass) {
+            classesToClassFields.remove(psiClass);
+            for (Classfield classField : PsiUtil.getFields(psiClass)) {
+                propertiesToClasses.get(classField).remove(psiClass);
+            }
+            classesToClassFields.remove(psiClass);
+            qualifiedNamesToClasses.remove(psiClass.getQualifiedName());
+        }
+
+
     }
 
     public static void resetIndex(Project project) {

@@ -14,7 +14,7 @@ public class Parameter extends Property{
 
     @Override
     public String toString() {
-        return "[Parameter: name=" + this.getName() + ", type=" + this.getTypes() + "]";
+        return this.name;
     }
 
 }

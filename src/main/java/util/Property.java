@@ -8,8 +8,8 @@ import java.util.Set;
 
 public abstract class Property {
 
-    private final String name;
-    private final Set<String> types;
+    protected final String name;
+    protected final Set<String> types;
 
     public Property(String name, JSType types) {
 
