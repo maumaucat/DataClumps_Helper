@@ -13,13 +13,15 @@ import org.jetbrains.annotations.NotNull;
 )
 public final class DataClumpSettings implements PersistentStateComponent<DataClumpSettings.State> {
 
-    public static final int DEFAULT_NUMBER_OF_PROPERTIES = 3;
 
     private State myState = new State();
 
     public static class State {
         @NonNls
-        public int minNumberOfProperties = DEFAULT_NUMBER_OF_PROPERTIES;
+        public int minNumberOfProperties = 3;
+        public boolean includeModifiersInDetection = true;
+        public boolean includeModifiersInExtractedClass = true;
+        // Hierachy of classes to be considered for data clump detection
     }
 
     public static DataClumpSettings getInstance() {

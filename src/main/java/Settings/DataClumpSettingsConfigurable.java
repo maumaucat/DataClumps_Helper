@@ -42,13 +42,17 @@ final class DataClumpSettingsConfigurable implements Configurable {
     public boolean isModified() {
         DataClumpSettings.State state =
                 Objects.requireNonNull(DataClumpSettings.getInstance().getState());
-        return !(mySettingsComponent.getNumberOfProperties() == (state.minNumberOfProperties));
+        return mySettingsComponent.getNumberOfProperties() != state.minNumberOfProperties
+                || mySettingsComponent.getIncludeModifiersInDetection() != state.includeModifiersInDetection
+                || mySettingsComponent.getIncludeModifiersInExtractedClass() != state.includeModifiersInExtractedClass;
     }
 
     @Override
     public void apply() {
         DataClumpSettings.State state = Objects.requireNonNull(DataClumpSettings.getInstance().getState());
         state.minNumberOfProperties = mySettingsComponent.getNumberOfProperties();
+        state.includeModifiersInDetection = mySettingsComponent.getIncludeModifiersInDetection();
+        state.includeModifiersInExtractedClass = mySettingsComponent.getIncludeModifiersInExtractedClass();
     }
 
 
@@ -57,6 +61,8 @@ final class DataClumpSettingsConfigurable implements Configurable {
         DataClumpSettings.State state =
                 Objects.requireNonNull(DataClumpSettings.getInstance().getState());
         mySettingsComponent.setNumberOfProperties(state.minNumberOfProperties);
+        mySettingsComponent.setIncludeModifiersInDetection(state.includeModifiersInDetection);
+        mySettingsComponent.setIncludeModifiersInExtractedClass(state.includeModifiersInExtractedClass);
     }
 
     @Override

@@ -415,7 +415,7 @@ public class PsiUtil {
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
     }
 
-    public static TypeScriptFunction createConstructor(TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body) {
+    public static TypeScriptFunction createConstructor(TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
 
         CodeSmellLogger.info("Creating constructor for class " + psiClass.getName());
         CodeSmellLogger.info("All fields: " + allFields);
@@ -453,7 +453,7 @@ public class PsiUtil {
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {
                 // for new Classfields use the modifier of the property
-                if (property instanceof Classfield) {
+                if (property instanceof Classfield && includeModifiers) {
                     List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
                         if (modifier.equals("abstract")) {
@@ -491,7 +491,7 @@ public class PsiUtil {
             // if property does not yet exist in the class, define it in the constructor
             if (!classfields.contains(property) && allFields.contains(property)) {
                 // for new Classfields use the modifier of the property
-                if (property instanceof Classfield) {
+                if (property instanceof Classfield && includeModifiers) {
                     List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
                         constructorCode.append(modifier + " ");

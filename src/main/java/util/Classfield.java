@@ -1,4 +1,5 @@
 package util;
+import Settings.DataClumpSettings;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 
@@ -33,8 +34,12 @@ public class Classfield extends Property {
     }
 
     public boolean matches(Classfield field){
-         return this.getName().equals(field.getName())
-                && this.getTypes().equals(field.getTypes())
-                && this.getModifier().equals(field.getModifier());
+        if (DataClumpSettings.getInstance().getState().includeModifiersInDetection) {
+            return this.getName().equals(field.getName())
+                    && this.getTypes().equals(field.getTypes())
+                    && this.getModifier().equals(field.getModifier());
+        }
+        return this.getName().equals(field.getName())
+                && this.getTypes().equals(field.getTypes());
     }
 }

@@ -173,7 +173,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         for (TypeScriptFunction otherFunction : potentialParameterParameterDataClumps.keySet()) {
             List<Parameter> matchingParameter = potentialParameterParameterDataClumps.get(otherFunction);
             if (matchingParameter.size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
-                for (JSParameterListElement psiParameter : currentFunction.getParameters())
+                for (JSParameterListElement psiParameter : currentFunction.getParameters()) {
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
                         holder.registerProblem(psiParameter, "Data Clump with Function " +
                                         otherFunction.getName() +
@@ -181,6 +181,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                                         + matchingParameter + ".",
                                 new DataClumpRefactoring(currentFunction, otherFunction, new ArrayList<>(matchingParameter)));
                     }
+                }
             }
         }
     }

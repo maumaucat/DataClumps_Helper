@@ -1,3 +1,4 @@
+import Settings.DataClumpSettings;
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.util.IntentionFamilyName;
@@ -126,7 +127,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         if (constructor == null) {
             // create constructor
             CodeSmellLogger.info("Creating new constructor for " + psiClass.getQualifiedName());
-            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, matchingProperties, optionalProperties, new ArrayList<>(), null);
+            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, matchingProperties, optionalProperties, new ArrayList<>(), null, DataClumpSettings.getInstance().getState().includeModifiersInDetection);
             PsiUtil.addFunctionToClass(psiClass, newConstructor);
         } else {
             CodeSmellLogger.info("Adjusting existing constructor of " + psiClass.getQualifiedName());
@@ -191,7 +192,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             JSBlockStatement body = constructor.getBlock();
 
             WriteCommandAction.runWriteCommandAction(psiClass.getProject(), constructor::delete);
-            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalProperties, constructorParameter, body );
+            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalProperties, constructorParameter, body, DataClumpSettings.getInstance().getState().includeModifiersInDetection);
             PsiUtil.addFunctionToClass(psiClass, newConstructor);
 
         }
@@ -367,9 +368,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         if (elementFile.equals(extractedFile)) return;
 
+        CodeSmellLogger.info("Adding import statement for " + extractedClass.getName() + " to " + elementFile.getName());
+        CodeSmellLogger.info("elementfile" + elementFile);
+        CodeSmellLogger.info("elmentfile valid" + elementFile.isValid());
         //check that there is not already an import statement for the extracted class
         for (ES6ImportDeclaration importStatement : PsiTreeUtil.findChildrenOfType(elementFile, ES6ImportDeclaration.class)) {
-            //TODO deal with other imports properly
             if (importStatement.getNamedImports() != null && importStatement.getNamedImports().getText().contains(extractedClass.getName())) {
                 return;
             }
@@ -691,20 +694,24 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields, Set<Property> optionalFields) {
         CodeSmellLogger.info("Extracting class...");
 
-        // filter all abstract fields
-        List<Property> abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")).toList();
-        List<Property> declaredFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("declare")).toList();
-
         List<Property> constructorFields = new ArrayList<>(fields);
-        constructorFields.removeAll(abstractFields);
-        constructorFields.removeAll(declaredFields);
+        List<Property> abstractFields = new ArrayList<>();
+        List<Property> declaredFields = new ArrayList<>();
+        if (DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass) {
+            // filter all abstract fields
+            abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")).toList();
+            declaredFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("declare")).toList();
 
-        abstractFields.forEach(optionalFields::remove);
-        declaredFields.forEach(optionalFields::remove);
+            constructorFields.removeAll(abstractFields);
+            constructorFields.removeAll(declaredFields);
+
+            abstractFields.forEach(optionalFields::remove);
+            declaredFields.forEach(optionalFields::remove);
+        }
 
         TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty(), true);
 
-        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null);
+        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null, DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
         PsiUtil.addFunctionToClass(psiClass, constructor);
 
         // add abstract fields
