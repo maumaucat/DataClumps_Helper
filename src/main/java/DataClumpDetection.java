@@ -11,15 +11,13 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
-
+import Settings.DataClumpSettings;
 import java.util.*;
 
 
 //TODO Delete Invalid Classes and Functions to save storage
 
 public class DataClumpDetection extends LocalInspectionTool {
-
-    static final int MIN_DATACLUMPS = 2;
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -30,7 +28,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 TypeScriptFunction psiFunction = PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class);
                 if (psiFunction.isConstructor()) return;
                 Index.updateFunction(psiFunction);
-                if (parameterList.getParameters().length >= MIN_DATACLUMPS) {
+                if (parameterList.getParameters().length >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                     detectDataClumpForFunction(psiFunction, holder);
                 }
                 super.visitJSParameterList(parameterList);
@@ -39,7 +37,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
                 Index.updateClass(TypeScriptClass);
-                if (PsiUtil.getFields(TypeScriptClass).size() >= MIN_DATACLUMPS) {
+                if (PsiUtil.getFields(TypeScriptClass).size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                     detectDataClumpForClass(TypeScriptClass, holder);
                 }
                 super.visitTypeScriptClass(TypeScriptClass);
@@ -89,7 +87,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         for (TypeScriptClass otherClass : potentialFieldFieldDataClumps.keySet()) {
 
             List<Classfield> matchingFields = potentialFieldFieldDataClumps.get(otherClass);
-            if (matchingFields.size() >= MIN_DATACLUMPS) {
+            if (matchingFields.size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                 for (Map.Entry<Classfield, PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())) {
                         String otherClassName = "anonymous";
@@ -105,7 +103,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         for (TypeScriptFunction otherFunction : potentialFieldParameterDataClumps.keySet()) {
             List<Classfield> matchingFields = potentialFieldParameterDataClumps.get(otherFunction);
-            if (matchingFields.size() >= MIN_DATACLUMPS) {
+            if (matchingFields.size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                 for (Map.Entry<Classfield, PsiElement> entry : currentFields.entrySet()) {
                     if (matchingFields.contains(entry.getKey())) {
                         holder.registerProblem(entry.getValue(), "Data Clump with Function " + otherFunction.getName() +
@@ -155,7 +153,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         for (TypeScriptClass otherClass : potentialParameterFieldDataClumps.keySet()) {
             List<Classfield> matchingParameter = potentialParameterFieldDataClumps.get(otherClass);
-            if (matchingParameter.size() >= MIN_DATACLUMPS) {
+            if (matchingParameter.size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                 for (JSParameterListElement psiParameter : currentFunction.getParameters())
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
                         String otherClassName = "anonymous";
@@ -174,7 +172,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         for (TypeScriptFunction otherFunction : potentialParameterParameterDataClumps.keySet()) {
             List<Parameter> matchingParameter = potentialParameterParameterDataClumps.get(otherFunction);
-            if (matchingParameter.size() >= MIN_DATACLUMPS) {
+            if (matchingParameter.size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                 for (JSParameterListElement psiParameter : currentFunction.getParameters())
                     if (matchingParameter.contains(new Parameter((TypeScriptParameter) psiParameter))) {
                         holder.registerProblem(psiParameter, "Data Clump with Function " +
@@ -248,4 +246,5 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         return superClasses;
     }
+
 }

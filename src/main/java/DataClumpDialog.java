@@ -207,6 +207,11 @@ public class DataClumpDialog extends DialogWrapper {
     }
 
     @Override
+    public @Nullable JComponent getPreferredFocusedComponent() {
+        return this.newClassNameField;
+    }
+
+    @Override
     protected @Nullable ValidationInfo doValidate() {
 
         if (shouldCreateNewClass()) {

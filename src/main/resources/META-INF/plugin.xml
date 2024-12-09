@@ -17,6 +17,13 @@
                 language="JavaScript"/>
         <postStartupActivity
                 implementation="PostStartupActivity"/>
+        <applicationService
+                serviceImplementation="Settings.DataClumpSettings"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="Settings.DataClumpSettingsConfigurable"
+                id="Settings.DataClumpSettingsConfigurable"
+                displayName="Data Clump Helper"/>
 
     </extensions>
 
