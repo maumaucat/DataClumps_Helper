@@ -74,7 +74,7 @@ public class Index {
         }
 
         classesToClassFields.put(psiClass, new ArrayList<>());
-        List<Classfield> classfields = PsiUtil.getFields(psiClass);
+        List<Classfield> classfields = PsiUtil.getClassfields(psiClass);
 
         for (Classfield classField : classfields) {
             classesToClassFields.get(psiClass).add(classField);
@@ -133,7 +133,7 @@ public class Index {
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
-        List<Classfield> new_Fields = PsiUtil.getFields(psiClass);
+        List<Classfield> new_Fields = PsiUtil.getClassfields(psiClass);
 
         // alle alten KlassenFelder
         List<Classfield> toBeRemoved = new ArrayList<>(classesToClassFields.get(psiClass));
@@ -190,7 +190,7 @@ public class Index {
 
         if (element instanceof TypeScriptClass psiClass) {
             classesToClassFields.remove(psiClass);
-            for (Classfield classField : PsiUtil.getFields(psiClass)) {
+            for (Classfield classField : PsiUtil.getClassfields(psiClass)) {
                 propertiesToClasses.get(classField).remove(psiClass);
             }
             classesToClassFields.remove(psiClass);

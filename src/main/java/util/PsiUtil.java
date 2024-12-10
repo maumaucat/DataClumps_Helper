@@ -15,6 +15,7 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.rename.RenameProcessor;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,28 +24,34 @@ import java.util.*;
 
 public class PsiUtil {
 
-    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Parameter parameter) {
-        for (JSParameterListElement psiParameter : function.getParameters()) {
-            if (parameter.equals(new Parameter((TypeScriptParameter) psiParameter))) {
-                return (TypeScriptParameter) psiParameter;
-            }
-        }
-        return null;
-    }
-
+    /**
+     * Creates a new field statement in the given context.
+     *
+     * @param context The context in which the field statement should be created.
+     * @param name The name of the field.
+     * @param type The type of the field.
+     * @param modifiers The modifiers of the field.
+     * @param optional Whether the field is optional.
+     * @param defaultValue The default value of the field.
+     **/
     public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, List<String> modifiers, boolean optional, String defaultValue) {
+
         StringBuilder fieldText = new StringBuilder();
+
         for (String modifier : modifiers) {
-            fieldText.append(modifier + " ");
+            fieldText.append(modifier).append(" ");
         }
+
         if (optional) {
-            fieldText.append(name + "?: " + type);
+            fieldText.append(name).append("?: ").append(type);
         } else {
-            fieldText.append(name + " : " + type);
+            fieldText.append(name).append(" : ").append(type);
         }
+
         if (defaultValue != null) {
-            fieldText.append(" = " + defaultValue);
+            fieldText.append(" = ").append(defaultValue);
         }
+
         fieldText.append(";");
 
 
@@ -53,38 +60,23 @@ public class PsiUtil {
         classCode.append(fieldText);
         classCode.append("}\n");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         return PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
     }
 
-    public static void addFieldToClass(TypeScriptClass psiClass, ES6FieldStatementImpl field) {
-
-        // Add the field to the correct position
-        PsiElement insertBefore;
-        ES6FieldStatementImpl firstField = PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
-        if (firstField != null) {
-            insertBefore = firstField;
-        } else if (psiClass.getFunctions().length > 0) {
-            CodeSmellLogger.info("Class has functions, inserting before the first one.");
-            insertBefore = psiClass.getFunctions()[0];
-        } else {
-            CodeSmellLogger.info("Class has no functions, inserting at the end.");
-            insertBefore =  psiClass.getLastChild();
-        }
-
-        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
-
-            psiClass.addBefore(field, insertBefore);
-
-            // Reformat the class
-            CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
-        });
-
-    }
-
+    /**
+     * Creates a new parameter in the given context.
+     *
+     * @param context The context in which the parameter should be created.
+     * @param name The name of the parameter.
+     * @param type The type of the parameter.
+     * @return The created parameter.
+     */
     public static TypeScriptParameter createTypeScriptParameter(PsiElement context, String name, JSType type) {
+
         String parameterText = name + " : " + type.getTypeText();
 
         StringBuilder functionCode = new StringBuilder();
@@ -92,363 +84,167 @@ public class PsiUtil {
         functionCode.append(parameterText);
         functionCode.append(") {}");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
         TypeScriptFunction psiFunction = PsiTreeUtil.getChildOfType(psiFile, TypeScriptFunction.class);
+
+        assert psiFunction != null;
 
         return (TypeScriptParameter) psiFunction.getParameters()[0];
     }
 
-    public static void addParameterToParameterList(TypeScriptParameter parameter, JSParameterList parameterList) {
-
-        JSParameterListElement[] listElements = parameterList.getParameters();
-        TypeScriptParameter[] parameters = new TypeScriptParameter[listElements.length + 1];
-
-        for (int i = 0; i < listElements.length; i++) {
-            parameters[i] = (TypeScriptParameter) listElements [i];
-        }
-        parameters[parameters.length - 1] = parameter;
-
-        JSParameterList newParameterList = createJSParameterList(parameterList, parameters);
-        WriteCommandAction.runWriteCommandAction(parameterList.getProject(), () -> {
-            parameterList.replace(newParameterList);
-        });
-
-
-    }
-
+    /**
+     * Creates a new parameter list in the given context.
+     *
+     * @param context The context in which the parameter list should be created.
+     * @param parameters The parameters of the parameter list.
+     * @return The created parameter list.
+     */
     public static JSParameterList createJSParameterList(PsiElement context, TypeScriptParameter[] parameters) {
 
-        StringBuilder functionCode = new StringBuilder();
-        functionCode.append("function psiUtilTemp(");
+        StringBuilder functionCode = new StringBuilder("function psiUtilTemp(");
+
         for (TypeScriptParameter parameter : parameters) {
             functionCode.append(parameter.getText());
             functionCode.append(",");
         }
-        functionCode.deleteCharAt(functionCode.length() - 1);
+
+        if (parameters.length > 0) {
+            functionCode.deleteCharAt(functionCode.length() - 1);
+        }
+
         functionCode.append(") {}");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
         TypeScriptFunction psiFunction = PsiTreeUtil.getChildOfType(psiFile, TypeScriptFunction.class);
+
+        assert psiFunction != null;
 
         return psiFunction.getParameterList();
     }
 
-    public static List<String> getModifiers(TypeScriptField field) {
-        List<String> modifiers = new ArrayList<>();
-        modifiers.add(field.getAccessType().toString().toLowerCase());
-
-        JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
-        modifiers.addAll(getModifiers(attributeList));
-        return  modifiers;
-    }
-
-    public static List<String> getModifiers(TypeScriptParameter parameter) {
-        List<String> modifiers = new ArrayList<>();
-        modifiers.add(parameter.getAccessType().toString().toLowerCase());
-
-        JSAttributeList attributeList = PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class);
-        modifiers.addAll(getModifiers(attributeList));
-        return  modifiers;
-    }
-
-    private static List<String> getModifiers(JSAttributeList attributeList) {
-
-        List<String> modifiers = new ArrayList<>();
-
-        // the order of the modifiers is important for the code generation
-        if (attributeList.hasModifier(JSAttributeList.ModifierType.STATIC)) modifiers.add("static");
-        if (attributeList.hasModifier(JSAttributeList.ModifierType.READONLY)) modifiers.add("readonly");
-        if (attributeList.hasModifier(JSAttributeList.ModifierType.ABSTRACT)) modifiers.add("abstract");
-        if (attributeList.hasModifier(JSAttributeList.ModifierType.DECLARE)) modifiers.add("declare");
-
-
-        return modifiers;
-    }
-
-    // classfields must match
-    public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
-        List<Classfield> classProperties = Index.getClassesToClassFields().get(psiClass);
-        for (Property property : properties) {
-            if (!classProperties.contains(property)) return false;
-            if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property)) return false;
-        }
-        return true;
-    }
-
-    public static Classfield getClassfield(TypeScriptClass psiClass, String fieldName) {
-        for (Classfield classfield : getFields(psiClass)) {
-            if (classfield.getName().equals(fieldName)) return classfield;
-        }
-        return null;
-    }
-
-    public static PsiElement getField(TypeScriptClass psiClass, String fieldName) {
-        HashMap<Classfield, PsiElement> fields = getFieldsToElement(psiClass);
-        for (Classfield classfield : fields.keySet()) {
-            if (classfield.getName().equals(fieldName)) return fields.get(classfield);
-        }
-        return null;
-    }
-
-    public static PsiElement getPsiField(JSClass psiClass, Property property) {
-        HashMap<Classfield, PsiElement> fields = getFieldsToElement(psiClass);
-        return fields.get(property);
-    }
-
-    public static void rename(PsiElement element, String newName) {
-        // Initialize a RenameProcessor to rename the field and update all references
-        RenameProcessor renameProcessor = new RenameProcessor(
-                element.getProject(),       // Current project
-                element,  // The field to be renamed
-                newName,  // New name for the field
-                false,         // Search in comments and strings (set true if needed)
-                true           // Search for text occurrences (e.g., in non-code files)
-        );
-
-        // Run the refactoring process
-        renameProcessor.run();
-    }
-
-    public static void makeFieldOptional(TypeScriptField field) {
-        ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
-        JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
-        String defaultValue = initializer != null ? initializer.getText() : null;
-        WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
-            statement.replace(createJSFieldStatement(field, field.getName(), field.getJSType().getTypeText(), getModifiers(field), true, defaultValue));
-        });
-    }
-
-    public static boolean hasSetter(TypeScriptClass psiClass, Classfield classfield) {
-        if (classfield.isPublic()) return true;
-        for (JSFunction psiFunction : psiClass.getFunctions()) {
-            if (!psiFunction.isSetProperty()) continue;
-
-            String setterName = psiFunction.getName();
-            String fieldName = classfield.getName();
-
-            // Setter should match field name directly or follow "set" convention
-            boolean nameMatches = setterName.equals(fieldName);
-
-            // Check if the parameter type of the setter matches the field type
-            Parameter setterParameter = new Parameter((TypeScriptParameter) psiFunction.getParameters()[0]);
-            boolean typeMatches = setterParameter.getTypes().equals(classfield.getTypes());
-
-            //TODO make sure that the right value is set
-            //TODO make sure that nothing is modified
-
-            if (nameMatches && typeMatches) return true;
-        }
-        return false;
-    }
-
-    public static boolean hasGetter(TypeScriptClass psiClass, Classfield classfield) {
-        if (classfield.isPublic()) return true;
-        for (JSFunction psiFunction : psiClass.getFunctions()) {
-            if (!psiFunction.isGetProperty()) continue;
-
-            String getterName = psiFunction.getName();
-            String fieldName = classfield.getName();
-
-            // Getter should match field name directly or follow "get" convention
-            boolean nameMatches = getterName.equals(fieldName);
-
-            // Check if the return type of the getter matches the field type
-            Parameter getterReturn = new Parameter("return", psiFunction.getReturnType());
-            boolean typeMatches = getterReturn.getTypes().equals(classfield.getTypes());
-
-            //TODO make sure that the right value is returned
-            //TODO make sure that nothing is modified
-
-            if (nameMatches && typeMatches) return true;
-        }
-        return false;
-    }
-
-    public static List<Classfield> getFields(TypeScriptClass psiClass) {
-        List<Classfield> fields = new ArrayList<>();
-        // iterate all FieldStatements
-        for (JSField field : psiClass.getFields()) {
-            if (field.getName() == null || field.getJSType() == null) continue;
-            fields.add(new Classfield((TypeScriptField) field));
-
-        }
-        // iterate constructor Parameter
-        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-        if (constructor != null) {
-            for (JSParameterListElement psiParameter : constructor.getParameters()) {
-                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-                // test if parameter is actually field
-                if (isParameterField((TypeScriptParameter) psiParameter)) {
-                    fields.add(new Classfield((TypeScriptParameter) psiParameter));
-                }
-            }
-        }
-        return fields;
-    }
-
-    public static boolean isParameterField(TypeScriptParameter parameter) {
-        return PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class).getTextLength() > 0;
-    }
-
-    public static boolean isAssignedNewValue(TypeScriptParameter parameter) {
-        // check if the parameter is assigned in the constructor to a field of the class that is in the properties list
-        for (PsiReference reference : ReferencesSearch.search(parameter)) {
-            // is the reference an assignment?
-            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
-
-            if (assignment != null && assignment.getLOperand().getFirstChild() == reference) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static List<Classfield> getAssignedToField(TypeScriptParameter parameter) {
-        List<Classfield> fields = new ArrayList<>();
-        for (PsiReference reference : ReferencesSearch.search(parameter)) {
-            // is the reference an assignment?
-            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
-
-            if (assignment != null && assignment.getROperand() == reference) {
-                if (assignment.getLOperand().getFirstChild() instanceof JSReferenceExpression referenceExpression) {
-                    Classfield field = resolveField(referenceExpression);
-                    if (field != null) fields.add(field);
-                }
-            }
-        }
-        return fields;
-    }
-
-    public static Classfield resolveField(JSReferenceExpression reference) {
-
-        PsiElement definition = reference.resolve();
-        if (definition instanceof TypeScriptField tsField) {
-            return new Classfield(tsField);
-        }
-        if (definition instanceof TypeScriptParameter tsParameter && PsiUtil.isParameterField(tsParameter)) {
-            return new Classfield(tsParameter);
-        }
-
-        return null;
-    }
-
-    public static Property resolveProperty(JSReferenceExpression reference) {
-        PsiElement definition = reference.resolve();
-        if (definition instanceof TypeScriptField tsField) {
-            return new Classfield(tsField);
-        }
-        if (definition instanceof TypeScriptParameter tsParameter) {
-            if (PsiUtil.isParameterField(tsParameter)) {
-                return new Classfield(tsParameter);
-            } else {
-                return new Parameter(tsParameter);
-            }
-        }
-
-        return null;
-    }
-
-    public static String getQualifiedName(PsiElement element) {
-        String name = "anonymous";
-        if (element instanceof TypeScriptField field) {
-            return field.getQualifiedName();
-        }
-        if (element instanceof TypeScriptParameter parameter) {
-            return parameter.getQualifiedName();
-        }
-        return null;
-    }
-
-    public static HashMap<Classfield, PsiElement> getFieldsToElement(JSClass psiClass) {
-        HashMap<Classfield, PsiElement> fields = new HashMap<>();
-        // iterate all FieldStatements
-        for (JSField field : psiClass.getFields()) {
-            if (field.getName() == null || field.getJSType() == null) continue;
-            fields.put(new Classfield((TypeScriptField) field), field);
-        }
-        // iterate constructor Parameter
-        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
-        if (constructor != null) {
-            for (JSParameterListElement psiParameter : constructor.getParameters()) {
-                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
-                // test if parameter is actually field
-                if (PsiTreeUtil.getChildOfType(psiParameter, JSAttributeList.class).getTextLength() > 0) { //TODO NOT VERY ELEGANT
-                    fields.put(new Classfield((TypeScriptParameter) psiParameter), psiParameter);
-                }
-            }
-        }
-        return fields;
-    }
-
+    /**
+     * Creates a getter function in the given context for the given property.
+     *
+     * @param context The context in which the getter should be created.
+     * @param property The property for which the getter should return the value.
+     * @param optional Whether the property is optional.
+     * @return The created getter function.
+     */
     public static TypeScriptFunction createGetter(PsiElement context, Property property, boolean optional) {
+
         StringBuilder getterText = new StringBuilder();
+
         if (optional) {
-            getterText.append("  get " + property.getName() + "(): " + property.getTypesAsString() + " | undefined {\n");
+            getterText.append("  get ").append(property.getName())
+                    .append("(): ").append(property.getTypesAsString()).append(" | undefined {\n");
         } else {
-            getterText.append("  get " + property.getName() + "(): " + property.getTypesAsString() + " {\n");
+            getterText.append("  get ").append(property.getName())
+                    .append("(): ").append(property.getTypesAsString()).append(" {\n");
         }
-        getterText.append("    return this._" + property.getName() + ";\n}");
+
+        getterText.append("    return this._").append(property.getName()).append(";\n}");
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
         classCode.append(getterText);
         classCode.append("}\n");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
+
+        assert psiClass != null;
 
         return (TypeScriptFunction) psiClass.getFunctions()[0];
     }
 
+    /**
+     * Creates a setter function in the given context for the given property.
+     *
+     * @param context The context in which the setter should be created.
+     * @param property The property for which the setter should set the value.
+     * @param optional Whether the property is optional.
+     * @return The created setter function.
+     */
     public static TypeScriptFunction createSetter(PsiElement context, Property property, boolean optional) {
 
-        String setterText;
+        StringBuilder setterText = new StringBuilder();
+
         if (optional) {
-            setterText = "  set " + property.getName() + "(value: " + property.getTypesAsString() + " | undefined) {\n";
+            setterText.append("  set ").append(property.getName())
+                    .append("(value: ").append(property.getTypesAsString()).append(" | undefined) {\n");
         } else {
-            setterText = "  set " + property.getName() + "(value: " + property.getTypesAsString() + ") {\n";
+            setterText.append("  set ").append(property.getName())
+                    .append("(value: ").append(property.getTypesAsString()).append(") {\n");
         }
-        setterText += "    this._" + property.getName() + " = value;\n}";
+        setterText.append("    this._").append(property.getName()).append(" = value;\n}");
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
         classCode.append(setterText);
         classCode.append("}\n");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
+
+        assert psiClass != null;
 
         return (TypeScriptFunction) psiClass.getFunctions()[0];
     }
 
+    /**
+     * Creates a new class in the given context.
+     *
+     * @param context The context in which the class should be created.
+     * @param className The name of the class.
+     * @param abstractClass Whether the class should be abstract.
+     * @param export Whether the class should be exported.
+     * @return The created class.
+     */
     public static TypeScriptClass createClass(PsiElement context, String className, boolean abstractClass, boolean export) {
+
         StringBuilder classText = new StringBuilder();
+
         if (export) {
             classText.append("export ");
         }
+
         if (abstractClass) {
             classText.append("abstract ");
         }
-        classText.append("class " + className + " {\n}\n");
 
-        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classText);
+        classText.append("class ").append(className).append(" {\n}\n");
+
+        PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classText);
+
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
     }
 
-    public static TypeScriptFunction createConstructor(TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
+    /**
+     * Creates a new constructor in the given class with the given parameters and fields and body.
+     *
+     * @param psiClass The class for which the constructor should be created.
+     * @param allFields The fields of the class that should be assigned in the constructor.
+     * @param optional The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
+     * @param allParameters The parameters the constructor should have.
+     * @param body The body of the constructor.
+     * @param includeModifiers Whether the modifiers of the fields should be included
+     *                        when the fields are created in the constructor.
+     * @return The created constructor.
+     */
+    public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
 
-        CodeSmellLogger.info("Creating constructor for class " + psiClass.getName());
-        CodeSmellLogger.info("All fields: " + allFields);
-        CodeSmellLogger.info("Optional fields: " + optional);
 
-
-        if (psiClass != null && psiClass.getConstructor() != null) {
+        if (psiClass.getConstructor() != null) {
             CodeSmellLogger.error("Constructor already exists for class " + psiClass.getName(), new IllegalArgumentException());
             return null;
         }
 
-        List<Classfield> classfields = new ArrayList<>();
-        if (psiClass != null) classfields = getFields(psiClass);
+        List<Classfield> classfields = getClassfields(psiClass);
 
         StringBuilder constructorCode = new StringBuilder();
 
@@ -457,10 +253,6 @@ public class PsiUtil {
 
         List<Property> requiredProperties = new ArrayList<>(allProperties);
         requiredProperties.removeAll(optional);
-
-
-        CodeSmellLogger.info("Required Properties: " + requiredProperties);
-        CodeSmellLogger.info("Optional: " + optional);
 
         constructorCode.append("constructor(");
         List<Property> assignedFields = new ArrayList<>();
@@ -565,34 +357,125 @@ public class PsiUtil {
 
     }
 
+    /**
+     * Adds a field to the given class.
+     *
+     * @param psiClass The class to which the field should be added.
+     * @param field The field to be added.
+     */
+    public static void addFieldToClass(TypeScriptClass psiClass, ES6FieldStatementImpl field) {
+
+        // Find the position where the field should be inserted
+        PsiElement insertBefore;
+        ES6FieldStatementImpl firstField = PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
+        if (firstField != null) {
+            insertBefore = firstField;
+        } else if (psiClass.getFunctions().length > 0) {
+            insertBefore = psiClass.getFunctions()[0];
+        } else {
+            insertBefore =  psiClass.getLastChild();
+        }
+
+        // Insert the field
+        WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
+            psiClass.addBefore(field, insertBefore);
+            CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
+        });
+
+    }
+
+    /**
+     * Adds a function to the given class.
+     *
+     * @param psiClass The class to which the function should be added.
+     * @param function The function to be added.
+     */
     public static void addFunctionToClass(TypeScriptClass psiClass, TypeScriptFunction function) {
 
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             // Add the function to the correct position
             if (psiClass.getConstructor() != null) {
-                CodeSmellLogger.info("Class has constructor, inserting after it.");
                 psiClass.addAfter(function, psiClass.getConstructor());
             } else if (psiClass.getFunctions().length > 0) {
-                CodeSmellLogger.info("Class has functions, inserting before the first one.");
                 psiClass.addBefore(function, psiClass.getFunctions()[0]);
             } else {
-                CodeSmellLogger.info("Class has no functions, inserting at the end.");
                 psiClass.addBefore(function, psiClass.getLastChild());
             }
 
-            // Reformat the class
             CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
         });
     }
 
-    public static String removeBrackets(String text) {
-        text = text.trim();
-        return text.substring(1, text.length() - 1);
+    /**
+     * Adds a parameter to the given parameter list.
+     *
+     * @param parameter The parameter to be added.
+     * @param parameterList The parameter list to which the parameter should be added.
+     */
+    public static void addParameterToParameterList(TypeScriptParameter parameter, JSParameterList parameterList) {
+
+        // collect all parameters in the parameter list and convert them to TypeScriptParameters
+        JSParameterListElement[] listElements = parameterList.getParameters();
+        TypeScriptParameter[] parameters = new TypeScriptParameter[listElements.length + 1];
+
+        for (int i = 0; i < listElements.length; i++) {
+            parameters[i] = (TypeScriptParameter) listElements[i];
+        }
+        parameters[parameters.length - 1] = parameter;
+
+        // create a new parameter list with the new parameter and replace the old one with it
+        JSParameterList newParameterList = createJSParameterList(parameterList, parameters);
+        WriteCommandAction.runWriteCommandAction(parameterList.getProject(), () -> {
+            parameterList.replace(newParameterList);
+        });
+
+
     }
 
-    public static TypeScriptClass makeClassExported(TypeScriptClass psiClass) {
-        if (psiClass.isExported()) return psiClass;
+    /**
+     * Renames the given element to the given new name. All references to the element are updated.
+     *
+     * @param element The element to be renamed.
+     * @param newName The new name of the element.
+     */
+    public static void rename(PsiNamedElement element, String newName) {
+        RenameProcessor renameProcessor = new RenameProcessor(
+                element.getProject(),
+                element,
+                newName,
+                false,
+                true
+        );
 
+        renameProcessor.run();
+    }
+
+    /**
+     * Makes the given field optional by adding a question mark to its name.
+     *
+     * @param field The field to be made optional.
+     */
+    public static void makeFieldOptional(TypeScriptField field) {
+
+        ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
+        JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
+
+        String defaultValue = initializer != null ? initializer.getText() : null;
+
+        WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
+            assert statement != null;
+            statement.replace(createJSFieldStatement(field, field.getName(), Objects.requireNonNull(field.getJSType()).getTypeText(), getModifiers(field), true, defaultValue));
+        });
+    }
+
+    /**
+     * Makes a given class exportable by adding the export keyword in front of it.
+     * @param psiClass The class to be made exportable.
+     * @return The class with the export keyword in front of it.
+     */
+    public static TypeScriptClass makeClassExported(TypeScriptClass psiClass) {
+
+        if (psiClass.isExported()) return psiClass;
 
         PsiDirectory dir = psiClass.getContainingFile().getContainingDirectory();
         String className = psiClass.getName();
@@ -606,6 +489,8 @@ public class PsiUtil {
         PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass newClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
+        assert newClass != null;
+
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             psiClass.replace(newClass);
             CodeStyleManager.getInstance(newClass.getProject()).reformat(newClass);
@@ -613,26 +498,412 @@ public class PsiUtil {
 
         // this is for some reason necessary to get the virtual file later on
         VirtualFile virtualFile = dir.getVirtualFile().findChild(className + ".ts");
-        PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
-        TypeScriptClass newClassWithVirtualFile = PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
+        assert virtualFile != null;
 
-        return newClassWithVirtualFile;
+        PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
+
+        return PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
     }
 
+    /**
+     * Removes the brackets surrounding the given text.
+     *
+     * @param text The text from which the brackets should be removed.
+     * @return The text without the brackets.
+     */
+    public static String removeBrackets(String text) {
+        text = text.trim();
+        return text.substring(1, text.length() - 1);
+    }
+
+    /**
+     * Returns all Modifiers of a attributeList as a list of strings.
+     *
+     * @param attributeList The attributeList of which the modifiers should be returned.
+     * @return The modifiers of the attributeList as a list of strings.
+     */
+    private static List<String> getModifiers(JSAttributeList attributeList) {
+
+        List<String> modifiers = new ArrayList<>();
+
+        // the order of the modifiers is important for the code generation
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.STATIC)) modifiers.add("static");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.READONLY)) modifiers.add("readonly");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.ABSTRACT)) modifiers.add("abstract");
+        if (attributeList.hasModifier(JSAttributeList.ModifierType.DECLARE)) modifiers.add("declare");
+
+        return modifiers;
+    }
+
+    /**
+     * Returns all Modifiers of a field as a list of strings.
+     *
+     * @param field The field of which the modifiers should be returned.
+     * @return The modifiers of the field as a list of strings.
+     */
+    public static List<String> getModifiers(TypeScriptField field) {
+        List<String> modifiers = new ArrayList<>();
+        modifiers.add(field.getAccessType().toString().toLowerCase());
+
+        JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
+
+        assert attributeList != null;
+
+        modifiers.addAll(getModifiers(attributeList));
+        return  modifiers;
+    }
+
+    /**
+     * Returns all Modifiers of a parameter that is defining a field as a list of strings.
+     *
+     * @param parameter The parameter of which the modifiers should be returned.
+     * @return The modifiers of the parameter as a list of strings.
+     */
+    public static List<String> getModifiers(TypeScriptParameter parameter) {
+
+        List<String> modifiers = new ArrayList<>();
+        modifiers.add(parameter.getAccessType().toString().toLowerCase());
+
+        JSAttributeList attributeList = PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class);
+
+        assert attributeList != null;
+
+        modifiers.addAll(getModifiers(attributeList));
+        return  modifiers;
+    }
+
+    /**
+     * Returns given a parameter all classfields that that parameter is assigned to.
+     * @param parameter The parameter for which the assigned fields should be returned.
+     * @return The classfields that the parameter is assigned to.
+     */
+    public static List<Classfield> getAssignedToField(TypeScriptParameter parameter) {
+
+        List<Classfield> fields = new ArrayList<>();
+
+        for (PsiReference reference : ReferencesSearch.search(parameter)) {
+            // is the reference an assignment?
+            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
+
+            if (assignment != null && assignment.getROperand() == reference) {
+                if (Objects.requireNonNull(assignment.getLOperand()).getFirstChild() instanceof JSReferenceExpression referenceExpression) {
+                    Classfield field = resolveField(referenceExpression);
+                    if (field != null) fields.add(field);
+                }
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * Returns all Classfields for a class.
+     *
+     * @param psiClass The class for which the fields should be returned.
+     * @return The fields of the class as a list of Classfields.
+     */
+    public static List<Classfield> getClassfields(TypeScriptClass psiClass) {
+
+        List<Classfield> fields = new ArrayList<>();
+
+        // iterate all FieldStatements
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.add(new Classfield((TypeScriptField) field));
+        }
+
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                // test if parameter is actually field
+                if (isParameterField((TypeScriptParameter) psiParameter)) {
+                    fields.add(new Classfield((TypeScriptParameter) psiParameter));
+                }
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * Returns all PsiElements (FieldStatements and Parameters) that define a field for a class.
+     *
+     * @param psiClass The class for which the fields should be returned.
+     * @return The fields of the class as a list of PsiElements.
+     */
+    public static List<PsiElement> getPsiFields(JSClass psiClass) {
+
+        // add all FieldStatements
+        List<PsiElement> fields = new ArrayList<>(Arrays.asList(psiClass.getFields()));
+
+        // iterate constructor Parameter
+        TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
+        if (constructor != null) {
+            for (JSParameterListElement psiParameter : constructor.getParameters()) {
+                // test if parameter is actually field
+                if (isParameterField((TypeScriptParameter) psiParameter)) {
+                    fields.add(psiParameter);
+                }
+            }
+        }
+        return fields;
+
+    }
+
+    /**
+     * Returns the classfield with the given name in the given class.
+     *
+     * @param psiClass The class in which the field should be found.
+     * @param fieldName The name of the field to be found.
+     * @return The classfield with the given name in the given class. Null if the field is not found.
+     */
+    public static Classfield getClassfield(TypeScriptClass psiClass, String fieldName) {
+
+        for (Classfield classfield : getClassfields(psiClass)) {
+            if (classfield.getName().equals(fieldName)) return classfield;
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the PsiElement (Parameter or Field) from a class that corresponds to the given classfield.
+     * @param psiClass The class in which the property should be found.
+     * @param classfield The classfield to be found.
+     * @return The PsiElement that corresponds to the given classfield. Null if the classfield is not found.
+     */
+    public static PsiElement getPsiField(JSClass psiClass, Classfield classfield) {
+        for (PsiElement element : getPsiFields(psiClass)) {
+            if (element instanceof TypeScriptField field && classfield.matches(new Classfield(field))) {
+                return field;
+            }
+            if (element instanceof TypeScriptParameter parameter && classfield.matches(new Classfield(parameter))) {
+                return parameter;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the PsiElement (Parameter or Field) from a class that corresponds to the given name.
+     *
+     * @param psiClass The class in which the property should be found.
+     * @param name The name of the property to be found.
+     * @return The PsiElement that corresponds to the given name. Null if the property is not found.
+     */
+    public static PsiElement getPsiField(JSClass psiClass, String name) {
+        for (PsiElement element : getPsiFields(psiClass)) {
+            if (element instanceof TypeScriptField field && Objects.equals(field.getName(), name)) {
+                return field;
+            }
+            if (element instanceof TypeScriptParameter parameter && Objects.equals(parameter.getName(), name)) {
+                return parameter;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the TypeScriptParameter from a function that corresponds to the given parameter.
+     *
+     * @param function The function in which the parameter should be found.
+     * @param parameter The parameter to be found.
+     * @return The TypeScriptParameter that corresponds to the given parameter. Null if the parameter is not found.
+     */
+    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Parameter parameter) {
+
+        for (JSParameterListElement psiParameter : function.getParameters()) {
+            if (parameter.equals(new Parameter((TypeScriptParameter) psiParameter))) {
+                return (TypeScriptParameter) psiParameter;
+            }
+        }
+
+        CodeSmellLogger.warn("Parameter " + parameter + " not found in function " + function.getName());
+        return null;
+    }
+
+    /**
+     * Returns the name of the given element if it has one or "anonymous" otherwise.
+     *
+     * @param element The element of which the name should be returned.
+     * @return The name of the given element if it has one or "anonymous" otherwise.
+     */
+    public static String getName(PsiElement element) {
+        String name = "anonymous";
+        if (element instanceof PsiNamedElement namedElement) {
+            name = namedElement.getName();
+        }
+        return null;
+    }
+
+    /**
+     * Returns weather the given class has a setter for the given classfield.
+     *
+     * @param psiClass The class in which the setter should be found.
+     * @param classfield The classfield for which the setter should be found.
+     */
+    public static boolean hasSetter(TypeScriptClass psiClass, Classfield classfield) {
+
+        if (classfield.isPublic()) return true;
+
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isSetProperty()) continue;
+
+            String setterName = psiFunction.getName();
+            String fieldName = classfield.getName();
+
+            if (setterName == null) continue;
+            boolean nameMatches = setterName.equals(fieldName);
+
+            Parameter setterParameter = new Parameter((TypeScriptParameter) psiFunction.getParameters()[0]);
+            boolean typeMatches = setterParameter.getTypes().equals(classfield.getTypes());
+
+            //TODO make sure that the right value is set
+            //TODO make sure that nothing is modified
+
+            if (nameMatches && typeMatches) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns weather the given class has a getter for the given classfield.
+     *
+     * @param psiClass The class in which the getter should be found.
+     * @param classfield The classfield for which the getter should be found.
+     */
+    public static boolean hasGetter(TypeScriptClass psiClass, Classfield classfield) {
+
+        if (classfield.isPublic()) return true;
+
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isGetProperty()) continue;
+
+            String getterName = psiFunction.getName();
+            String fieldName = classfield.getName();
+
+            // Getter should match field name directly or follow "get" convention
+            if (getterName == null) continue;
+            boolean nameMatches = getterName.equals(fieldName);
+
+            // Check if the return type of the getter matches the field type
+            Parameter getterReturn = new Parameter("return", psiFunction.getReturnType());
+            boolean typeMatches = getterReturn.getTypes().equals(classfield.getTypes());
+
+            //TODO make sure that the right value is returned
+            //TODO make sure that nothing is modified
+
+            if (nameMatches && typeMatches) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns weather the given parameter is defining a field.
+     * @param parameter The parameter to be checked.
+     * @return True if the parameter is defining a field, false otherwise.
+     */
+    public static boolean isParameterField(TypeScriptParameter parameter) {
+        return Objects.requireNonNull(PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class)).getTextLength() > 0;
+    }
+
+    /**
+     * Returns weather the given parameter is assigned a new value in its function.
+     * @param parameter The parameter to be checked.
+     * @return True if the parameter is assigned a new value, false otherwise.
+     */
+    public static boolean isAssignedNewValue(TypeScriptParameter parameter) {
+
+        for (PsiReference reference : ReferencesSearch.search(parameter)) {
+            // is the reference an assignment?
+            JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
+
+            if (assignment != null && Objects.requireNonNull(assignment.getLOperand()).getFirstChild() == reference) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns weather the given class has all the given properties.
+     * @param psiClass The class in which the properties should be found.
+     * @param properties The properties to be found.
+     * @return True if the class has all the given properties, false otherwise.
+     */
+    public static boolean hasAll(TypeScriptClass psiClass, List<Property> properties) {
+
+        List<Classfield> classProperties = Index.getClassesToClassFields().get(psiClass);
+
+        for (Property property : properties) {
+            if (!classProperties.contains(property)) return false;
+            if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Returns for a given reference the corresponding Classfield.
+     *
+     * @param reference The reference for which the Classfield should be resolved.
+     * @return The Classfield that corresponds to the given reference.
+     *          Null if the reference does not correspond to a Classfield.
+     */
+    public static Classfield resolveField(JSReferenceExpression reference) {
+
+        PsiElement definition = reference.resolve();
+        if (definition instanceof TypeScriptField tsField) {
+            return new Classfield(tsField);
+        }
+        if (definition instanceof TypeScriptParameter tsParameter && PsiUtil.isParameterField(tsParameter)) {
+            return new Classfield(tsParameter);
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns for a given reference the corresponding Property.
+     *
+     * @param reference The reference for which the Property should be resolved.
+     * @return The Property that corresponds to the given reference.
+     *          Null if the reference does not correspond to a Property.
+     */
+    public static Property resolveProperty(JSReferenceExpression reference) {
+        PsiElement definition = reference.resolve();
+
+        if (definition instanceof TypeScriptField tsField) {
+            return new Classfield(tsField);
+        }
+
+        if (definition instanceof TypeScriptParameter tsParameter) {
+            if (PsiUtil.isParameterField(tsParameter)) {
+                return new Classfield(tsParameter);
+            } else {
+                return new Parameter(tsParameter);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the relative path from one file to another. In the way that the path can be used in an import statement.
+     *
+     * @param from The file from which the path should be calculated.
+     * @param to The file to which the path should be calculated.
+     * @return The relative path from one file to another.
+     */
     public static String getRelativePath(PsiFile from, PsiFile to) {
         String fromPathString = from.getVirtualFile().getPath();
         String toPathString = to.getVirtualFile().getPath();
 
-        // Umwandeln der Pfade in Path-Objekte
         Path fromPath = Paths.get(fromPathString);
         Path toPath = Paths.get(toPathString);
 
-        // Berechne den relativen Pfad
         Path relativePath = fromPath.relativize(toPath);
 
-        // Entferne den Dateinamen (Endung) und ersetze Backslashes durch Slashes
         String relativePathString = relativePath.toString();
-
 
         return "./" + relativePathString.replace("\\", "/").substring(3, relativePathString.length()-3);
     }

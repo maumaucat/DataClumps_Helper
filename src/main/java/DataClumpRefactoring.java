@@ -9,6 +9,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
@@ -181,7 +182,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             optionalProperties.retainAll(allProperties);
 
             for (Property optionalProperty : optionalProperties) {
-                PsiElement field = PsiUtil.getPsiField(psiClass, optionalProperty);
+                PsiElement field = PsiUtil.getPsiField(psiClass, optionalProperty.getName());
                 if (field instanceof TypeScriptField) {
                     PsiUtil.makeFieldOptional((TypeScriptField) field);
                 }
@@ -273,11 +274,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private void getDefaultValues(TypeScriptClass psiClass, List<Property> properties, HashMap<Classfield, String> defaultValues) {
 
         defaultValues.clear();
-        HashMap<Classfield, PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
 
-        for (Map.Entry<Classfield, PsiElement> entry : fieldsToElement.entrySet()) {
-            Classfield classfield = entry.getKey();
-            PsiElement psiField = entry.getValue();
+        List<Classfield> classfields = Index.getClassesToClassFields().get(psiClass);
+
+        for (Classfield classfield : classfields)  {
+            PsiElement psiField = PsiUtil.getPsiField(psiClass, classfield);
 
             if (properties.contains(classfield)) {
                 JSExpression initializer;
@@ -312,15 +313,15 @@ public class DataClumpRefactoring implements LocalQuickFix {
             }
         }
 
-        HashMap<Classfield, PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
         boolean changed;
-       do {
+        do {
            changed = false;
            for (Property property : properties) {
                // is the property already an optional property
                if (optionalProperties.contains(property)) continue;
                // is the property assigned to an optional property
-               PsiElement psiField = fieldsToElement.get(property);
+               PsiElement psiField = PsiUtil.getPsiField(psiClass, property.getName());
+
                for (PsiReference reference : ReferencesSearch.search(psiField)) {
                    JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
                    if (assignment != null && assignment.getLOperand().getFirstChild() == reference
@@ -343,7 +344,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
                }
            }
-       } while (changed);
+        } while (changed);
 
         return optionalProperties;
     }
@@ -475,11 +476,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
 
-        HashMap<Classfield,PsiElement> fieldsToElement = PsiUtil.getFieldsToElement(psiClass);
+        List<Classfield> classfields = Index.getClassesToClassFields().get(psiClass);
 
-        for (Map.Entry<Classfield,PsiElement> entry : fieldsToElement.entrySet()) {
-            Classfield classfield = entry.getKey();
-            PsiElement psiField = entry.getValue();
+        for (Classfield classfield : classfields) {
+            PsiElement psiField = PsiUtil.getPsiField(psiClass, classfield);
 
             if (properties.contains(classfield)) {
 
@@ -790,7 +790,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             CodeSmellLogger.info("Checking class " + psiClass.getQualifiedName());
             for (Property property : properties) {
                 CodeSmellLogger.info("Checking property " + property.getName());
-                PsiElement psiField = PsiUtil.getPsiField(psiClass, property);
+                PsiElement psiField = PsiUtil.getPsiField(psiClass, property.getName());
                 CodeSmellLogger.info("PsiField: " + psiField);
 
                 TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();

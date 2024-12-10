@@ -33,7 +33,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
                 Index.updateClass(TypeScriptClass);
-                if (PsiUtil.getFields(TypeScriptClass).size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
+                if (PsiUtil.getClassfields(TypeScriptClass).size() >= DataClumpSettings.getInstance().getState().minNumberOfProperties) {
                     //detectDataClumpForClass(TypeScriptClass, holder);
                     detectDataClump(TypeScriptClass, holder);
                 }
@@ -75,13 +75,13 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                         PsiElement dataClumpElement = null;
                        if (currentElement instanceof JSClass currentClass) {
-                           dataClumpElement = PsiUtil.getPsiField(currentClass, property);
+                           dataClumpElement = PsiUtil.getPsiField(currentClass, property.getName());
                        } else {
                            TypeScriptFunction currentFunction = (TypeScriptFunction) currentElement;
                            dataClumpElement = PsiUtil.getPsiParameter(currentFunction, (Parameter) property);
                        }
 
-                        holder.registerProblem(dataClumpElement, "Data Clump with " + PsiUtil.getQualifiedName(otherElement) +
+                        holder.registerProblem(dataClumpElement, "Data Clump with " + PsiUtil.getName(otherElement) +
                                ". Matching Properties " + matchingProperties + ".", new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
 
                     }
