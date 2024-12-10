@@ -381,140 +381,6 @@ public class PsiUtil {
         constructorCode.append("}\n");
     }
 
-
-    /**
-     * Creates a new constructor in the given class with the given parameters and fields and body.
-     *
-     * @param psiClass The class for which the constructor should be created.
-     * @param allFields The fields of the class that should be assigned in the constructor.
-     * @param optional The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
-     * @param allParameters The parameters the constructor should have.
-     * @param body The body of the constructor.
-     * @param includeModifiers Whether the modifiers of the fields should be included
-     *                        when the fields are created in the constructor.
-     * @return The created constructor.
-     */
- /*   public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
-
-        // Check if the constructor already exists in the class -> error
-        if (psiClass.getConstructor() != null) {
-            CodeSmellLogger.error("Constructor already exists for class " + psiClass.getName(), new IllegalArgumentException());
-            return null;
-        }
-
-
-        List<Property> toBeAssignedFields = new ArrayList<>();
-        List<Classfield> classfields = getClassfields(psiClass);
-
-        List<Property> allProperties = new ArrayList<>(allFields);
-        allProperties.addAll(allParameters);
-
-        List<Property> requiredProperties = new ArrayList<>(allProperties);
-        requiredProperties.removeAll(optional);
-
-        StringBuilder constructorCode = new StringBuilder("constructor(");
-
-        for (Property property : requiredProperties) {
-
-            final String propertyName = property.getName();
-            final String propertyType = property.getTypesAsString();
-
-            // if property does not yet exist in the class, define it in the constructor
-            if (allFields.contains(property) && !classfields.contains(property)) {
-
-                // for new Classfields use the modifier of the property if includeModifiers is true
-                if (property instanceof Classfield && includeModifiers) {
-                    List<String> modifiers = ((Classfield) property).getModifier();
-                    for (String modifier : modifiers) {
-                        if (modifier.equals("abstract")) {
-                            CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
-                        } else if (modifier.equals("declare")) {
-                            CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
-                        } else {
-                            constructorCode.append(modifier + " ");
-                        }
-                    }
-                    // If the property is public, do not use the underscore prefix
-                    if (modifiers.contains("public")) {
-                        constructorCode.append(propertyName + ": " + propertyType + ", ");
-                    } else {
-                        constructorCode.append("_" + propertyName + ": " + propertyType + ", ");
-                    }
-                } else {
-                    // For Parameters use the private as default visibility
-                    constructorCode.append("private _" + propertyName + ": " + propertyType + ", ");
-                }
-            } else {
-                // if property already exists in the class or is a parameter just add it
-                constructorCode.append(propertyName + ": " + propertyType + ", ");
-                if (allFields.contains(property)) {
-                    toBeAssignedFields.add(property);
-                }
-            }
-        }
-
-        for (Property property : optional) {
-
-            final String propertyName = property.getName();
-            final String propertyType = property.getTypesAsString();
-
-            // if property does not yet exist in the class, define it in the constructor
-            if (!classfields.contains(property) && allFields.contains(property)) {
-                // for new Classfields use the modifier of the property
-                if (property instanceof Classfield && includeModifiers) {
-                    List<String> modifiers = ((Classfield) property).getModifier();
-                    for (String modifier : modifiers) {
-                        constructorCode.append(modifier + " ");
-                    }
-                    // If the property is public, do not use the underscore prefix
-                    if (modifiers.contains("public")) {
-                        constructorCode.append(propertyName + "?: " + propertyType + ", ");
-                    } else {
-                        constructorCode.append("_" + propertyName + "?: " + propertyType + ", ");
-                    }
-                } else {
-                    // For Parameters use the private as default visibility
-                    constructorCode.append("private _" + propertyName + "?: " + propertyType + ", ");
-                }
-            } else {
-                constructorCode.append(propertyName + "?: " + propertyType + ", ");
-                if (allFields.contains(property)) {
-                    toBeAssignedFields.add(property);
-                }
-            }
-        }
-
-        // Remove trailing comma and close the constructor
-        if (!allFields.isEmpty() || !allParameters.isEmpty()) {
-            constructorCode.setLength(constructorCode.length() - 2);
-        }
-
-        constructorCode.append(") {");
-
-        // add assignments
-        for (Property field : toBeAssignedFields) {
-            constructorCode.append("\nthis.").append(field.getName()).append(" = ").append(field.getName()).append(";");
-        }
-
-        // add the constructor body
-        if (body != null) {
-            constructorCode.append("\n").append(removeBrackets(body.getText()));
-        }
-
-        constructorCode.append("}\n");
-
-        StringBuilder classCode = new StringBuilder();
-        classCode.append("class PsiUtilTemp {\n");
-        classCode.append(constructorCode);
-        classCode.append("}\n");
-
-        PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
-        TypeScriptClass wrapper = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
-
-        return (TypeScriptFunction) wrapper.getConstructor();
-
-    } */
-
     /**
      * Adds a field to the given class.
      *
@@ -839,6 +705,7 @@ public class PsiUtil {
                 return parameter;
             }
         }
+        CodeSmellLogger.warn("Field " + classfield.getName() + " not found in class " + psiClass.getName());
         return null;
     }
 
@@ -858,6 +725,8 @@ public class PsiUtil {
                 return parameter;
             }
         }
+
+        CodeSmellLogger.warn("Field " + name + " not found in class " + psiClass.getName());
         return null;
     }
 
@@ -877,6 +746,18 @@ public class PsiUtil {
         }
 
         CodeSmellLogger.warn("Parameter " + parameter + " not found in function " + function.getName());
+        return null;
+    }
+
+    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, String name) {
+
+        for (JSParameterListElement psiParameter : function.getParameters()) {
+            if (Objects.equals(psiParameter.getName(), name)) {
+                return (TypeScriptParameter) psiParameter;
+            }
+        }
+
+        CodeSmellLogger.warn("Parameter " + name + " not found in function " + function.getName());
         return null;
     }
 
