@@ -98,7 +98,7 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         for (Classfield classfield : Index.getClassesToClassFields().get(currentClass)) {
 
-            for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(classfield)) {
+            for (TypeScriptClass otherClass : new ArrayList<>(Index.getPropertiesToClasses().get(classfield))) {
 
                 if (!check(currentClass, otherClass)) continue;
                 List<Classfield> classfieldList = Index.getClassesToClassFields().get(otherClass);
@@ -111,7 +111,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
 
             if (!Index.getPropertiesToFunctions().containsKey(classfield)) continue;
-            for (TypeScriptFunction otherFunction : Index.getPropertiesToFunctions().get(classfield)) {
+            for (TypeScriptFunction otherFunction : new ArrayList<>(Index.getPropertiesToFunctions().get(classfield))) {
                 if (!check(currentClass, otherFunction)) continue;
                 if (!potentialDataClumps.containsKey(otherFunction)) {
                     potentialDataClumps.put(otherFunction, new ArrayList<>());
@@ -127,7 +127,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
 
         for (Parameter parameter : Index.getFunctionsToParameters().get(currentFunction)) {
-            for (TypeScriptFunction otherFunction : Index.getPropertiesToFunctions().get(parameter)) {
+            for (TypeScriptFunction otherFunction : new ArrayList<>(Index.getPropertiesToFunctions().get(parameter))) {
                 if (!check(currentFunction, otherFunction)) continue;
                 if (!potentialDataClumps.containsKey(otherFunction)) {
                     potentialDataClumps.put(otherFunction, new ArrayList<>());
@@ -136,7 +136,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                }
 
             if (!Index.getPropertiesToClasses().containsKey(parameter)) continue;
-            for (TypeScriptClass otherClass : Index.getPropertiesToClasses().get(parameter)) {
+            for (TypeScriptClass otherClass : new ArrayList<>(Index.getPropertiesToClasses().get(parameter))) {
                 if (!check(currentFunction, otherClass)) continue;
 
                 Classfield classfield = Index.getMatchingClassFieldForClass(otherClass, parameter);

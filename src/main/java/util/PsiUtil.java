@@ -224,6 +224,7 @@ public class PsiUtil {
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
     }
 
+
     /**
      * Creates a new constructor in the given class with the given parameters and fields and body.
      *
@@ -236,17 +237,174 @@ public class PsiUtil {
      *                        when the fields are created in the constructor.
      * @return The created constructor.
      */
-    public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
+    public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass,
+                                                       List<Property> allFields,
+                                                       Set<Property> optional,
+                                                       List<Property> allParameters,
+                                                       JSBlockStatement body,
+                                                       boolean includeModifiers) {
 
-
+        // Check if constructor already exists
         if (psiClass.getConstructor() != null) {
             CodeSmellLogger.error("Constructor already exists for class " + psiClass.getName(), new IllegalArgumentException());
             return null;
         }
 
+        // Prepare the data structures
+        List<Property> toBeAssignedFields = new ArrayList<>();
         List<Classfield> classfields = getClassfields(psiClass);
+        List<Property> allProperties = new ArrayList<>(allFields);
+        allProperties.addAll(allParameters);
 
-        StringBuilder constructorCode = new StringBuilder();
+        // Separate required properties (non-optional) and optional ones
+        List<Property> requiredProperties = new ArrayList<>(allProperties);
+        requiredProperties.removeAll(optional);
+
+        // Build the constructor code
+        StringBuilder constructorCode = new StringBuilder("constructor(");
+
+        // Add the properties to the constructor code -> first required, then optional
+        appendPropertyListToConstructorCode(requiredProperties, allFields, classfields, toBeAssignedFields, constructorCode, includeModifiers, false);
+        appendPropertyListToConstructorCode(new ArrayList<>(optional), allFields, classfields, toBeAssignedFields, constructorCode, includeModifiers, true);
+
+        // Clean up and finalize the constructor definition
+        if (!allFields.isEmpty() || !allParameters.isEmpty()) { // Check if the constructor has parameters
+            constructorCode.setLength(constructorCode.length() - 2); // Remove trailing comma
+        }
+        constructorCode.append(") {");
+
+        // Add the constructor body and field assignments
+        addConstructorBodyAndAssignments(constructorCode, body, toBeAssignedFields);
+
+        // Wrap in a temporary class and create the PsiFile
+        StringBuilder classCode = new StringBuilder("class PsiUtilTemp {\n");
+        classCode.append(constructorCode);
+        classCode.append("}\n");
+
+        PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        TypeScriptClass wrapper = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
+
+        assert wrapper != null;
+
+        return (TypeScriptFunction) wrapper.getConstructor();
+    }
+
+    /**
+     * Appends a list of properties to the constructor code.
+     *
+     * @param properties The properties to be added to the constructor code.
+     * @param allFields The properties of @param properties that are fields.
+     * @param classfields The fields that already exist in the class.
+     * @param toBeAssignedFields The fields that should be assigned in the constructor body.
+     *                           This list is updated by this method.
+     *                           If a property is already a field in the class, it is added to this list.
+     * @param constructorCode The constructor code to which the properties should be added.
+     *                        This StringBuilder is updated by this method.
+     * @param includeModifiers Whether the modifiers of the fields should be included
+     *                       when the fields are created in the constructor.
+     * @param isOptional Whether the properties are optional.
+     */
+    private static void appendPropertyListToConstructorCode(List<Property> properties,
+                                                            List<Property> allFields,
+                                                            List<Classfield> classfields,
+                                                            List<Property> toBeAssignedFields,
+                                                            StringBuilder constructorCode,
+                                                            boolean includeModifiers,
+                                                            boolean isOptional) {
+
+        // iterate over all properties and add them to the constructor code
+        for (Property property : properties) {
+
+            String propertyName = property.getName();
+            String propertyType = property.getTypesAsString();
+
+            // If the property should be a field in the class and does not yet exist, define it in the constructor
+            if (allFields.contains(property) && !classfields.contains(property)) {
+
+                // For new Classfields, use the modifier of the property if includeModifiers is true
+                if (property instanceof Classfield && includeModifiers) {
+
+                    // Add modifiers (if any)
+                    List<String> modifiers = ((Classfield) property).getModifier();
+                    for (String modifier : modifiers) {
+                        if (modifier.equals("abstract")) {
+                            CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
+                        } else if (modifier.equals("declare")) {
+                            CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
+                        } else {
+                            constructorCode.append(modifier).append(" ");
+                        }
+                    }
+
+                    // Add the property with its type and visibility
+                    if (!((Classfield) property).getModifier().contains("public")) {
+                        constructorCode.append("_").append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                    } else {
+                        constructorCode.append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                    }
+                } else { // If the property has no modifiers or modifiers should not be included, use the default visibility
+                    constructorCode.append("private _").append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                }
+            } else { // If the property already exists in the class or is a parameter, just add it as a parameter
+                constructorCode.append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                // If the property is a field in the class, add it to the list of fields to be assigned in the body
+                if (allFields.contains(property)) {
+                    toBeAssignedFields.add(property);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds the constructor body and field assignments to the constructor code.
+     *
+     * @param constructorCode The constructor code to which the body and assignments should be added.
+     *                        This StringBuilder is updated by this method.
+     * @param body The body of the constructor.
+     *             If provided, this body is added to the constructor code.
+     * @param toBeAssignedFields The fields that should be assigned in the constructor body.
+     */
+    private static void addConstructorBodyAndAssignments(StringBuilder constructorCode,
+                                                         JSBlockStatement body,
+                                                         List<Property> toBeAssignedFields) {
+
+        // Add field assignments
+        for (Property field : toBeAssignedFields) {
+            constructorCode.append("\nthis.").append(field.getName()).append(" = ").append(field.getName()).append(";");
+        }
+
+        // Add the constructor body if provided
+        if (body != null) {
+            constructorCode.append("\n").append(removeBrackets(body.getText()));
+        }
+
+        constructorCode.append("}\n");
+    }
+
+
+    /**
+     * Creates a new constructor in the given class with the given parameters and fields and body.
+     *
+     * @param psiClass The class for which the constructor should be created.
+     * @param allFields The fields of the class that should be assigned in the constructor.
+     * @param optional The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
+     * @param allParameters The parameters the constructor should have.
+     * @param body The body of the constructor.
+     * @param includeModifiers Whether the modifiers of the fields should be included
+     *                        when the fields are created in the constructor.
+     * @return The created constructor.
+     */
+ /*   public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass, List<Property> allFields, Set<Property> optional, List<Property> allParameters, JSBlockStatement body, boolean includeModifiers) {
+
+        // Check if the constructor already exists in the class -> error
+        if (psiClass.getConstructor() != null) {
+            CodeSmellLogger.error("Constructor already exists for class " + psiClass.getName(), new IllegalArgumentException());
+            return null;
+        }
+
+
+        List<Property> toBeAssignedFields = new ArrayList<>();
+        List<Classfield> classfields = getClassfields(psiClass);
 
         List<Property> allProperties = new ArrayList<>(allFields);
         allProperties.addAll(allParameters);
@@ -254,8 +412,7 @@ public class PsiUtil {
         List<Property> requiredProperties = new ArrayList<>(allProperties);
         requiredProperties.removeAll(optional);
 
-        constructorCode.append("constructor(");
-        List<Property> assignedFields = new ArrayList<>();
+        StringBuilder constructorCode = new StringBuilder("constructor(");
 
         for (Property property : requiredProperties) {
 
@@ -263,8 +420,9 @@ public class PsiUtil {
             final String propertyType = property.getTypesAsString();
 
             // if property does not yet exist in the class, define it in the constructor
-            if (!classfields.contains(property) && allFields.contains(property)) {
-                // for new Classfields use the modifier of the property
+            if (allFields.contains(property) && !classfields.contains(property)) {
+
+                // for new Classfields use the modifier of the property if includeModifiers is true
                 if (property instanceof Classfield && includeModifiers) {
                     List<String> modifiers = ((Classfield) property).getModifier();
                     for (String modifier : modifiers) {
@@ -290,7 +448,7 @@ public class PsiUtil {
                 // if property already exists in the class or is a parameter just add it
                 constructorCode.append(propertyName + ": " + propertyType + ", ");
                 if (allFields.contains(property)) {
-                    assignedFields.add(property);
+                    toBeAssignedFields.add(property);
                 }
             }
         }
@@ -321,7 +479,7 @@ public class PsiUtil {
             } else {
                 constructorCode.append(propertyName + "?: " + propertyType + ", ");
                 if (allFields.contains(property)) {
-                    assignedFields.add(property);
+                    toBeAssignedFields.add(property);
                 }
             }
         }
@@ -334,13 +492,13 @@ public class PsiUtil {
         constructorCode.append(") {");
 
         // add assignments
-        for (Property field : assignedFields) {
-            constructorCode.append("\nthis." + field.getName() + " = " + field.getName() + ";");
+        for (Property field : toBeAssignedFields) {
+            constructorCode.append("\nthis.").append(field.getName()).append(" = ").append(field.getName()).append(";");
         }
 
         // add the constructor body
         if (body != null) {
-            constructorCode.append("\n" + removeBrackets(body.getText()));
+            constructorCode.append("\n").append(removeBrackets(body.getText()));
         }
 
         constructorCode.append("}\n");
@@ -355,7 +513,7 @@ public class PsiUtil {
 
         return (TypeScriptFunction) wrapper.getConstructor();
 
-    }
+    } */
 
     /**
      * Adds a field to the given class.
