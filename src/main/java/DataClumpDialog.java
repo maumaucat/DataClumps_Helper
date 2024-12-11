@@ -45,6 +45,7 @@ public class DataClumpDialog extends DialogWrapper {
     private final DataClumpRefactoring refactoring;
 
 
+
     public DataClumpDialog(DataClumpRefactoring refactoring, List<Property> matching, PsiElement current, PsiElement other) {
         super(true);
         this.project = current.getProject();

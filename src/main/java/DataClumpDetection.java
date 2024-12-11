@@ -12,6 +12,12 @@ import org.jetbrains.annotations.NotNull;
 import Settings.DataClumpSettings;
 import java.util.*;
 
+/**
+ * The Data Clump Detection Inspection.
+ * A data clump is a group of fields or parameters that are always used together. This inspection
+ * detects data clumps in classes and functions and marks them as problems. The user can then apply
+ * the Data Clump Refactoring to refactor the data clumps.
+ */
 public class DataClumpDetection extends LocalInspectionTool {
 
     /**
