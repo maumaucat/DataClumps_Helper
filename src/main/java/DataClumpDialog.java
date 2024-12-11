@@ -1,3 +1,4 @@
+import com.intellij.ide.HelpTooltip;
 import com.intellij.lang.ecmascript6.psi.ES6ImportDeclaration;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
@@ -5,6 +6,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
@@ -12,11 +14,13 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
 import util.CodeSmellLogger;
 import util.Index;
 import util.Property;
+import util.PsiUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,27 +29,60 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
-
+/**
+ * Dialog for the Data Clump Refactoring that allows the user to select which parameters or fields should be extracted
+ * into a new class. The user can also choose to create a new class or use an existing one.
+ */
 public class DataClumpDialog extends DialogWrapper {
 
-    private List<Property> matching;
+    private final String DATACLUMP_EXPLANATION = "Data Clumps are defined by <a href='https://martinfowler.com/bliki/DataClump.html'>Fowler</a> as a group of parameters " +
+            "or fields that appear together repeatedly at various places in the code, possibly in different orders." +
+            " These can be a sign that the code needs to be refactored. " +
+            "This refactoring allows you to extract these parameters or fields into a new class.";
+
+    /**
+     * List of properties that are part of the data clump.
+     */
+    private final List<Property> matching;
+
+    /**
+     * The project and the two elements that are part of the data clump.
+     */
+    private final Project project;
+    /**
+     * The first element that is part of the data clump.
+     */
+    private final PsiElement current;
+    /**
+     * The second element that is part of the data clump.
+     */
+    private final PsiElement other;
+    /**
+     * The refactoring quickfix.
+     */
+    private final DataClumpRefactoring refactoring;
+
+    /**
+     * GUI elements for the dialog.
+     */
     private JRadioButton newClassButton;
     private JRadioButton existingClassButton;
     private JTextField newClassNameField;
     private JLabel newClassLabel;
     private JLabel existingClassLabel;
-    private ComboBox existingComboBox;
-    private HashMap<Property, JCheckBox> propertySelections = new HashMap<>();
+    private ComboBox<String> existingComboBox;
+    private final HashMap<Property, JCheckBox> propertySelections = new HashMap<>();
     private TextFieldWithBrowseButton directoryBrowseButton;
     private JPanel checkBoxPanel;
 
-    private final Project project;
-    private final PsiElement current;
-    private final PsiElement other;
-    private final DataClumpRefactoring refactoring;
-
-
-
+    /**
+     * Creates a new DataClumpDialog.
+     *
+     * @param refactoring the refactoring quickfix
+     * @param matching the list of properties that are part of the data clump
+     * @param current the first element that is part of the data clump
+     * @param other the second element that is part of the data clump
+     */
     public DataClumpDialog(DataClumpRefactoring refactoring, List<Property> matching, PsiElement current, PsiElement other) {
         super(true);
         this.project = current.getProject();
@@ -53,10 +90,17 @@ public class DataClumpDialog extends DialogWrapper {
         this.current = current;
         this.other = other;
         this.refactoring = refactoring;
+
         setTitle("Data Clump Refactoring");
+
         init();
     }
 
+    /**
+     * Creates the center panel of the dialog.
+     *
+     * @return the center panel of the dialog
+     */
     @Nullable
     @Override
     protected JComponent createCenterPanel() {
@@ -64,16 +108,25 @@ public class DataClumpDialog extends DialogWrapper {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(5); // abstände
 
+        addInfoPanel(dialogPanel, gbc);
         addRadioButtons(dialogPanel, gbc);
         addNewClassInput(dialogPanel, gbc);
         addDirectoryBrowser(dialogPanel, gbc);
         addCheckBoxPanel(dialogPanel, gbc);
-        addExistingClassSelector(dialogPanel, gbc);
+        addExistingClassSelector();
 
         configureRadioButtonActions(dialogPanel, gbc);
 
         return dialogPanel;
     }
+
+
+    /**
+     * Adds the radio buttons to the dialog panel. The user can choose to create a new class or use an existing one.
+     *
+     * @param panel the dialog panel
+     * @param gbc the grid bag constraints
+     */
     private void addRadioButtons(JPanel panel, GridBagConstraints gbc) {
         JRadioButton newClassRadioButton = new JRadioButton("Create new Class");
         JRadioButton existingClassRadioButton = new JRadioButton("Use existing Class");
@@ -83,12 +136,11 @@ public class DataClumpDialog extends DialogWrapper {
         this.newClassButton = newClassRadioButton;
         this.existingClassButton = existingClassRadioButton;
 
-        // Standardmäßig "Enter new class name" ausgewählt
+        // standard selection -> new class
         newClassRadioButton.setSelected(true);
 
-        // Layout der Radiobuttons
         gbc.gridx = 0;
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.anchor = GridBagConstraints.WEST;
         panel.add(newClassRadioButton, gbc);
@@ -96,6 +148,37 @@ public class DataClumpDialog extends DialogWrapper {
         panel.add(existingClassRadioButton, gbc);
     }
 
+    /**
+     * Adds the info panel to the dialog panel. The info panel contains a description of the refactoring.
+     *
+     * @param dialogPanel the dialog panel
+     * @param gbc the grid bag constraints
+     */
+    private void addInfoPanel(JPanel dialogPanel, GridBagConstraints gbc) {
+        String info = "Refactoring Data Clump between " + PsiUtil.getName(current) + " and " + PsiUtil.getName(other);
+
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panel.add(new JBLabel(info));
+        JLabel tip = new JBLabel(IconLoader.getIcon("/icons/contextHelp.svg", getClass()));
+        HelpTooltip helpTooltip = new HelpTooltip();
+        helpTooltip.setDescription(DATACLUMP_EXPLANATION);
+        helpTooltip.installOn(tip);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 3;
+        gbc.anchor = GridBagConstraints.WEST;
+
+        panel.add(tip);
+        dialogPanel.add(panel, gbc);
+    }
+
+    /**
+     * Adds the input field for the new class name to the dialog panel.
+     *
+     * @param panel the dialog panel
+     * @param gbc the grid bag constraints
+     */
     private void addNewClassInput(JPanel panel, GridBagConstraints gbc) {
         this.newClassLabel = new JLabel("Enter Class Name:");
         JTextField newClassField = new JTextField(20);
@@ -109,6 +192,12 @@ public class DataClumpDialog extends DialogWrapper {
         panel.add(newClassField, gbc);
     }
 
+    /**
+     * Adds the directory browser to the dialog panel. The user can choose the target directory for the new class.
+     *
+     * @param panel the dialog panel
+     * @param gbc the grid bag constraints
+     */
     private void addDirectoryBrowser(JPanel panel, GridBagConstraints gbc) {
         TextFieldWithBrowseButton directoryBrowseButton = new TextFieldWithBrowseButton();
         FileChooserDescriptor descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
@@ -121,14 +210,21 @@ public class DataClumpDialog extends DialogWrapper {
                 descriptor
         );
 
-        // Standardauswahl ist das aktuelle Verzeichnis
+        // default directory is the directory of the element from which the refactoring is triggered
         directoryBrowseButton.setText(current.getContainingFile().getContainingDirectory().getVirtualFile().getPath());
         this.directoryBrowseButton = directoryBrowseButton;
 
-        gbc.gridx = 2;
+        gbc.gridx = 3;
         panel.add(directoryBrowseButton, gbc);
     }
 
+    /**
+     * Adds the checkbox panel to the dialog panel. The user can select which parameters or fields should be extracted
+     * into the new class.
+     *
+     * @param panel the dialog panel
+     * @param gbc the grid bag constraints
+     */
     private void addCheckBoxPanel(JPanel panel, GridBagConstraints gbc) {
         JLabel checkBoxLabel = new JLabel("Choose which parameters or fields should be extracted into the new class:");
         JPanel checkBoxPanel = new JPanel(new FlowLayout());
@@ -136,8 +232,11 @@ public class DataClumpDialog extends DialogWrapper {
             JCheckBox checkBox = new JCheckBox(property.getName() + ":" + property.getTypes());
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
-                if (existingClassButton.isSelected()) {
-                    setClassSelection(refactoring.getUsableClasses(getProperties()));
+                setClassSelection(refactoring.getUsableClasses(getProperties()));
+                if (existingComboBox.getItemCount() == 0) {
+                    existingClassButton.setEnabled(false);
+                } else {
+                    existingClassButton.setEnabled(true);
                 }
             });
             checkBoxPanel.add(checkBox);
@@ -145,7 +244,6 @@ public class DataClumpDialog extends DialogWrapper {
         }
         this.checkBoxPanel = checkBoxPanel;
 
-        // Layout für Checkbox-Panel
         gbc.gridx = 0;
         gbc.gridy = 3;
         gbc.gridwidth = 3;
@@ -156,22 +254,35 @@ public class DataClumpDialog extends DialogWrapper {
         panel.add(checkBoxPanel, gbc);
     }
 
-    private void addExistingClassSelector(JPanel panel, GridBagConstraints gbc) {
+    /**
+     * Creates the existing class selector. The user can choose an existing class to which the selected parameters or
+     * fields should be extracted.
+     */
+    private void addExistingClassSelector() {
         ComboBox<String> existingComboBox = new ComboBox<>();
         this.existingClassLabel = new JLabel("Existing class:");
         this.existingComboBox = existingComboBox;
 
         setClassSelection(refactoring.getUsableClasses(getProperties()));
+        if (existingComboBox.getItemCount() == 0) {
+            existingClassButton.setEnabled(false);
+        }
     }
 
+    /**
+     * Adds listener to the radio buttons to switch between creating a new class and using an existing one.
+     *
+     * @param panel the dialog panel
+     * @param gbc the grid bag constraints
+     */
     private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {
         this.newClassButton.addActionListener(e -> {
-            panel.remove(existingComboBox);
             panel.remove(existingClassLabel);
+            panel.remove(existingComboBox);
 
             gbc.gridwidth = 1;
-            gbc.gridx = 0;
             gbc.gridy = 2;
+            gbc.gridx = 0;
             panel.add(newClassLabel, gbc);
             gbc.gridx = 1;
             panel.add(newClassNameField, gbc);
@@ -187,8 +298,8 @@ public class DataClumpDialog extends DialogWrapper {
             panel.remove(directoryBrowseButton);
 
             gbc.gridwidth = 1;
-            gbc.gridx = 0;
             gbc.gridy = 2;
+            gbc.gridx = 0;
             panel.add(existingClassLabel, gbc);
             gbc.gridwidth = 2;
             gbc.gridx = 1;
@@ -198,6 +309,11 @@ public class DataClumpDialog extends DialogWrapper {
         });
     }
 
+    /**
+     * Sets the class selection in the existing class selector.
+     *
+     * @param classes the classes that can be selected
+     */
     private void setClassSelection(Set<TypeScriptClass> classes) {
         existingComboBox.removeAllItems();
 
@@ -209,11 +325,22 @@ public class DataClumpDialog extends DialogWrapper {
         existingComboBox.repaint();
     }
 
+    /**
+     * Returns with the preferred focused component.
+     * @return the preferred focused component
+     */
     @Override
     public @Nullable JComponent getPreferredFocusedComponent() {
         return this.newClassNameField;
     }
 
+    /**
+     * Validates the user input. Checks if the entered class name is valid, if the directory is valid, if the class name
+     * is not empty, if the class name does not contain special characters, if the class name does not already exist in
+     * the directory, if the class name is not already imported, and if enough parameters or fields are selected.
+     *
+     * @return the validation info
+     */
     @Override
     protected @Nullable ValidationInfo doValidate() {
 
@@ -270,6 +397,13 @@ public class DataClumpDialog extends DialogWrapper {
         return super.doValidate();
     }
 
+    /**
+     * Checks if the class name is already imported in the file.
+     *
+     * @param className the class name
+     * @param file the file
+     * @return true if the class name is already imported in the file, false otherwise
+     */
     private boolean isImported(String className, PsiFile file) {
 
         for (ES6ImportDeclaration importStatement : PsiTreeUtil.findChildrenOfType(file, ES6ImportDeclaration.class)) {
@@ -280,6 +414,11 @@ public class DataClumpDialog extends DialogWrapper {
         return false;
     }
 
+    /**
+     * Returns the class name that the user entered.
+     *
+     * @return the class name that the user entered
+     */
     public String getClassName() {
         if (this.newClassButton.isSelected()) {
             return this.newClassNameField.getText().trim();
@@ -287,6 +426,11 @@ public class DataClumpDialog extends DialogWrapper {
         return null;
     }
 
+    /**
+     * Returns the directory that the user selected.
+     *
+     * @return the directory that the user selected
+     */
     public PsiDirectory getDirectory() {
         String path = this.directoryBrowseButton.getText();
         VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByPath(path);
@@ -296,6 +440,11 @@ public class DataClumpDialog extends DialogWrapper {
         return null;
     }
 
+    /**
+     * Returns the properties that the user selected.
+     *
+     * @return the properties that the user selected
+     */
     public List<Property> getProperties() {
         List<Property> selectedProperties = new ArrayList<>();
 
@@ -308,13 +457,27 @@ public class DataClumpDialog extends DialogWrapper {
         return selectedProperties;
     }
 
+    /**
+     * Returns the selected class.
+     *
+     * @return the selected class
+     */
     public TypeScriptClass getSelectedClass() {
         if (this.existingComboBox.getComponents() == null) return null;
         String qualifiedName = (String) this.existingComboBox.getSelectedItem();
         return Index.getQualifiedNamesToClasses().get(qualifiedName);
     }
 
+    /**
+     * Returns if the user wants to create a new class.
+     *
+     * @return true if the user wants to create a new class, false otherwise
+     */
     public boolean shouldCreateNewClass() {
         return this.newClassButton.isSelected();
+    }
+
+    public String getDATACLUMP_EXPLANATION() {
+        return DATACLUMP_EXPLANATION;
     }
 }

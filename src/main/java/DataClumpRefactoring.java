@@ -70,6 +70,13 @@ public class DataClumpRefactoring implements LocalQuickFix {
      */
     private final HashMap<Classfield, String> otherDefaultValues = new HashMap<>();
 
+    /**
+     * Creates a new DataClumpRefactoring.
+     *
+     * @param currentElement the first element that contains the data clump
+     * @param otherElement the second element that contains the data clump
+     * @param matchingProperties the properties that are always used together
+     */
     public DataClumpRefactoring(@NotNull PsiElement currentElement, @NotNull PsiElement otherElement, @NotNull List<Property> matchingProperties) {
         SmartPointerManager psiPointerManager = SmartPointerManager.getInstance(currentElement.getProject());
         this.matchingProperties = matchingProperties;
