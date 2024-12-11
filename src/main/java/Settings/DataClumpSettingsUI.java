@@ -3,15 +3,11 @@ package Settings;
 import com.intellij.ide.HelpTooltip;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.util.ui.UIUtil;
-import kotlinx.coroutines.flow.Flow;
-import util.CodeSmellLogger;
-
 import javax.swing.*;
 import java.awt.*;
+import java.util.Objects;
 
 /**
  * Supports creating and managing a {@link JPanel} for the Settings Dialog.
@@ -33,7 +29,7 @@ public class DataClumpSettingsUI {
 
         Integer[] options = {2, 3, 4, 5, 6, 7, 8, 9, 10};
         numberOfProperties = new ComboBox<>(options);
-        numberOfProperties.setSelectedItem(DataClumpSettings.getInstance().getState().minNumberOfProperties);
+        numberOfProperties.setSelectedItem(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties);
         includeModifiersInDetection.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInDetection);
         includeModifiersInExtractedClass.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
         if (!includeModifiersInDetection.isSelected()) {
@@ -97,6 +93,7 @@ public class DataClumpSettingsUI {
     }
 
     public int getNumberOfProperties() {
+        assert numberOfProperties.getSelectedItem() != null;
         return (int) numberOfProperties.getSelectedItem();
     }
 
