@@ -39,17 +39,19 @@ public class DataClumpDialog extends DialogWrapper {
     private TextFieldWithBrowseButton directoryBrowseButton;
     private JPanel checkBoxPanel;
 
-    private Project project;
-    private PsiElement current;
-    private PsiElement other;
+    private final Project project;
+    private final PsiElement current;
+    private final PsiElement other;
+    private final DataClumpRefactoring refactoring;
 
 
-    public DataClumpDialog(List<Property> matching, PsiElement current, PsiElement other) {
+    public DataClumpDialog(DataClumpRefactoring refactoring, List<Property> matching, PsiElement current, PsiElement other) {
         super(true);
         this.project = current.getProject();
         this.matching = matching;
         this.current = current;
         this.other = other;
+        this.refactoring = refactoring;
         setTitle("Data Clump Refactoring");
         init();
     }
@@ -134,7 +136,7 @@ public class DataClumpDialog extends DialogWrapper {
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
                 if (existingClassButton.isSelected()) {
-                    setClassSelection(DataClumpRefactoring.getUsableClasses(getProperties()));
+                    setClassSelection(refactoring.getUsableClasses(getProperties()));
                 }
             });
             checkBoxPanel.add(checkBox);
@@ -158,7 +160,7 @@ public class DataClumpDialog extends DialogWrapper {
         this.existingClassLabel = new JLabel("Existing class:");
         this.existingComboBox = existingComboBox;
 
-        setClassSelection(DataClumpRefactoring.getUsableClasses(getProperties()));
+        setClassSelection(refactoring.getUsableClasses(getProperties()));
     }
 
     private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {

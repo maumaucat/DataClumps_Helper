@@ -181,16 +181,15 @@ public class Index {
     public static void removeElement(PsiElement element) {
 
         if (element instanceof TypeScriptFunction psiFunction) {
-            functionsToParameters.remove(psiFunction);
-            for (Parameter parameter : getParameters(psiFunction)) {
+            for (Parameter parameter : functionsToParameters.get(psiFunction)) {
                 propertiesToFunctions.get(parameter).remove(psiFunction);
             }
             functionsToParameters.remove(psiFunction);
         }
 
         if (element instanceof TypeScriptClass psiClass) {
-            classesToClassFields.remove(psiClass);
-            for (Classfield classField : PsiUtil.getClassfields(psiClass)) {
+
+            for (Classfield classField : classesToClassFields.get(psiClass)) {
                 propertiesToClasses.get(classField).remove(psiClass);
             }
             classesToClassFields.remove(psiClass);

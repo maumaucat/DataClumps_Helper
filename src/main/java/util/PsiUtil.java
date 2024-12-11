@@ -502,13 +502,11 @@ public class PsiUtil {
         if (psiClass.isExported()) return psiClass;
 
         PsiDirectory dir = psiClass.getContainingFile().getContainingDirectory();
-        String className = psiClass.getName();
+        String fileName = psiClass.getContainingFile().getName();
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("export ");
         classCode.append(psiClass.getText());
-
-        CodeSmellLogger.info(classCode.toString());
 
         PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass newClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
@@ -521,10 +519,12 @@ public class PsiUtil {
         });
 
         // this is for some reason necessary to get the virtual file later on
-        VirtualFile virtualFile = dir.getVirtualFile().findChild(className + ".ts");
+        VirtualFile virtualFile = dir.getVirtualFile().findChild(fileName);
         assert virtualFile != null;
 
         PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
+        CodeSmellLogger.info("File: " + file);
+        CodeSmellLogger.info("valid " + file.isValid());
 
         return PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
     }
@@ -772,7 +772,7 @@ public class PsiUtil {
         if (element instanceof PsiNamedElement namedElement) {
             name = namedElement.getName();
         }
-        return null;
+        return name;
     }
 
     /**
