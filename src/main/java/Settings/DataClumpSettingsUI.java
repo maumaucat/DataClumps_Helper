@@ -19,14 +19,6 @@ import java.awt.*;
 public class DataClumpSettingsUI {
 
 
-    private final String TOOLTIP_NUMBER_OF_PROPERTIES = "The minimal number of fields or parameters that should be equal in order to be considered a data clump.";
-    private final String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "If selected, the modifiers of the fields will be considered when detecting data clumps. " +
-            "In this case the modifier must be equal do two fields can be equal. " +
-            "If deselected, only the names and types of the fields will be considered.";
-    private final String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "If selected, the modifiers of the fields will be included in the extracted class. " +
-            "If deselected, all fields will be private in the extracted class " +
-            "or if using an existing class, the modifiers will stay as they are in that class.";
-
     private final JPanel mainPanel;
     private final ComboBox<Integer> numberOfProperties;
     private final JCheckBox includeModifiersInDetection = new JCheckBox("Include Modifiers in Detection");
@@ -34,6 +26,9 @@ public class DataClumpSettingsUI {
 
 
 
+    /**
+     * Creates a new instance of the settings UI
+     */
     public DataClumpSettingsUI() {
 
         Integer[] options = {2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -46,7 +41,15 @@ public class DataClumpSettingsUI {
         }
 
 
-         mainPanel = FormBuilder.createFormBuilder()
+        String TOOLTIP_NUMBER_OF_PROPERTIES = "The minimal number of fields or parameters that should be equal in order to be considered a data clump.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "If selected, the modifiers of the fields will be considered when detecting data clumps. " +
+                "In this case the modifier must be equal do two fields can be equal. " +
+                "If deselected, only the names and types of the fields will be considered.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "If selected, the modifiers of the fields will be included in the extracted class. " +
+                "If deselected, all fields will be private in the extracted class " +
+                "or if using an existing class, the modifiers will stay as they are in that class.";
+
+        mainPanel = FormBuilder.createFormBuilder()
                 .addComponent(new JBLabel("Settings for data clump detection: "))
                 .addLabeledComponent(new JBLabel("Number of Fields or Parameters: "), addHelpToolTip(numberOfProperties, TOOLTIP_NUMBER_OF_PROPERTIES), 1, false)
                 .addComponent(addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1)
@@ -67,6 +70,13 @@ public class DataClumpSettingsUI {
         });
     }
 
+    /**
+     * Adds a help tooltip to a component. The tooltip is displayed when hovering over the help icon.
+     *
+     * @param component The component to add the tooltip to
+     * @param text The text of the tooltip
+     * @return The component with the tooltip
+     */
     private JComponent addHelpToolTip(JComponent component, String text) {
 
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -81,12 +91,11 @@ public class DataClumpSettingsUI {
         return panel;
     }
 
-    // Set the value in the combo box
+
     public void setNumberOfProperties(int value) {
        numberOfProperties.setSelectedItem(String.valueOf(value));
     }
 
-    // Get the value from the combo box
     public int getNumberOfProperties() {
         return (int) numberOfProperties.getSelectedItem();
     }
@@ -107,12 +116,10 @@ public class DataClumpSettingsUI {
         return includeModifiersInExtractedClass.isSelected();
     }
 
-    // Get the main panel for the settings dialog
     public JPanel getPanel() {
         return mainPanel;
     }
 
-    // Get the component that should be focused by default
     public JComponent getPreferredFocusedComponent() {
         return numberOfProperties;
     }

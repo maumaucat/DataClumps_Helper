@@ -17,14 +17,29 @@ import java.util.*;
 
 public class Index {
 
+    /**
+     * Maps a Property to a List of TypeScriptFunctions that use this Property as a parameter
+     */
     private static HashMap<Property,List<TypeScriptFunction>> propertiesToFunctions;
 
+    /**
+     * Maps a Property to a List of TypeScriptClasses that use this Property as a field
+     */
     private static HashMap<Property, List<TypeScriptClass>> propertiesToClasses;
 
+    /**
+     * Maps a TypeScriptClass to a List of Classfields that are in this class
+     */
     private static HashMap<TypeScriptClass, List<Classfield>> classesToClassFields;
 
+    /**
+     * Maps a TypeScriptFunction to a List of Parameters that are in this function
+     */
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
 
+    /**
+     * Maps a qualified name to a TypeScriptClass
+     */
     private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
 
     public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
@@ -47,6 +62,12 @@ public class Index {
         return functionsToParameters;
     }
 
+    /**
+     * Returns all the Parameters of a TypeScriptFunction
+     *
+     * @param psiFunction The TypeScriptFunction to get the Parameters from
+     * @return A List of Parameters
+     */
     private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
         List<Parameter> parameters = new ArrayList<>();
         for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
@@ -58,19 +79,31 @@ public class Index {
         return parameters;
     }
 
+    /**
+     * Returns the matching ClassField for a Property in a TypeScriptClass
+     *
+     * @param psiClass The TypeScriptClass to get the matching ClassField from
+     * @param property The Property to get the matching ClassField for
+     * @return The matching ClassField
+     */
     public static Classfield getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) { //TODO duplicate to getField?
         List<Classfield> classfields = classesToClassFields.get(psiClass);
         for (Classfield classField : classfields) {
             if (classField.equals(property)) return classField;
         }
-        CodeSmellLogger.error("No matching ClassField found for " + property + " in " + psiClass, new IllegalArgumentException());
+        CodeSmellLogger.warn("No matching ClassField found for " + property + " in " + psiClass);
         return null;
     }
 
+    /**
+     * Adds a TypeScriptClass to the index
+     *
+     * @param psiClass The TypeScriptClass to add
+     */
     public static void addClass(TypeScriptClass psiClass) {
 
         if (psiClass.getQualifiedName() != null) {
-            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
+            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         }
 
         classesToClassFields.put(psiClass, new ArrayList<>());
@@ -78,15 +111,20 @@ public class Index {
 
         for (Classfield classField : classfields) {
             classesToClassFields.get(psiClass).add(classField);
-            addClassFieldForClass(psiClass, classField);
+            addClassForClassfield(psiClass, classField);
         }
     }
 
+    /**
+     * Adds a TypeScriptFunction to the index
+     *
+     * @param psiFunction The TypeScriptFunction to add
+     */
     public static void addFunction(TypeScriptFunction psiFunction) {
 
         if (psiFunction.isConstructor()) return;
 
-        functionsToParameters.put(psiFunction, new ArrayList<Parameter>());
+        functionsToParameters.put(psiFunction, new ArrayList<>());
         List<Parameter> parameters = getParameters(psiFunction);
 
         // iterate all Parameters in function
@@ -96,6 +134,11 @@ public class Index {
         }
     }
 
+    /**
+     * Updates a TypeScriptFunction in the index
+     *
+     * @param psiFunction The TypeScriptFunction to update
+     */
     public static void updateFunction(TypeScriptFunction psiFunction) {
 
         if (psiFunction.isConstructor()) return;
@@ -120,6 +163,11 @@ public class Index {
         }
     }
 
+    /**
+     * Updates a TypeScriptClass in the index
+     *
+     * @param psiClass The TypeScriptClass to update
+     */
     public static void updateClass(TypeScriptClass psiClass) {
 
         // wenn die Klasse neu ist -> hinzufügen
@@ -129,7 +177,7 @@ public class Index {
         }
 
         if (psiClass.getQualifiedName() != null) {
-            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), (TypeScriptClass) psiClass);
+            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
@@ -148,16 +196,21 @@ public class Index {
         }
 
         for (Classfield classField: new_Fields) {
-            addClassFieldForClass(psiClass, classField);
+            addClassForClassfield(psiClass, classField);
         }
     }
 
+    /**
+     * Adds a new Function for a Parameter to the index
+     *
+     * @param function The TypeScriptFunction to add
+     * @param parameter The Parameter to add the function for
+     */
     public static void addFunctionForParameter(TypeScriptFunction function, Parameter parameter) {
         if (propertiesToFunctions.containsKey(parameter)) {
-            // schon eingetragen -> nothing to do
             if (propertiesToFunctions.get(parameter).contains(function)) return;
             propertiesToFunctions.get(parameter).add(function);
-        } else { // ansonsten neuen Eintrag
+        } else {
             List<TypeScriptFunction> functions = new ArrayList<>();
             functions.add(function);
             propertiesToFunctions.put(parameter, functions);
@@ -165,19 +218,28 @@ public class Index {
 
     }
 
-    public static void addClassFieldForClass(TypeScriptClass psiClass, Classfield classField) {
-        // wenn schon da add to list
+    /**
+     * Adds a new Class for a ClassField to the index
+     *
+     * @param psiClass The TypeScriptClass to add
+     * @param classField The ClassField to add the class for
+     */
+    public static void addClassForClassfield(TypeScriptClass psiClass, Classfield classField) {
         if (propertiesToClasses.containsKey(classField)) {
-            // wenn bereits eingetragen nothing to do
             if (propertiesToClasses.get(classField).contains(psiClass)) return;
             propertiesToClasses.get(classField).add(psiClass);
-        } else { // sonst neuer Eintrag
+        } else {
             List<TypeScriptClass> classList = new ArrayList<>();
             classList.add(psiClass);
             propertiesToClasses.put(classField, classList);
         }
     }
 
+    /**
+     * Removes an element from the index
+     *
+     * @param element The element to remove
+     */
     public static void removeElement(PsiElement element) {
 
         if (element instanceof TypeScriptFunction psiFunction) {
@@ -199,6 +261,11 @@ public class Index {
 
     }
 
+    /**
+     * Resets the index and rebuilds it
+     *
+     * @param project The project to reset the index for
+     */
     public static void resetIndex(Project project) {
 
         propertiesToFunctions = new HashMap<>();
@@ -243,6 +310,9 @@ public class Index {
 
     }
 
+    /**
+     * Prints the index
+     */
     public static void printClassFieldsToClasses() {
         ApplicationManager.getApplication().runReadAction(() -> {
         CodeSmellLogger.info("ClassesFields to Classes: ");
@@ -261,6 +331,9 @@ public class Index {
         }});
     }
 
+    /**
+     * Prints the index
+     */
     public static void printParametersToFunctions() {
         ApplicationManager.getApplication().runReadAction(() -> {
         CodeSmellLogger.info("Parameters to Functions: ");
@@ -276,6 +349,9 @@ public class Index {
         });
     }
 
+    /**
+     * Prints the index
+     */
     public static void printFunctionsToParameter() {
         ApplicationManager.getApplication().runReadAction(() -> {
             CodeSmellLogger.info("Functions to Parameter: ");
@@ -290,6 +366,9 @@ public class Index {
         });
     }
 
+    /**
+     * Prints the index
+     */
     public static void printClassesToClassFields() {
         ApplicationManager.getApplication().runReadAction(() -> {
             CodeSmellLogger.info("Classes to ClassFields: ");

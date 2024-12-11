@@ -1,24 +1,21 @@
 package Settings;
 
-import com.intellij.internal.statistic.eventLog.validator.rules.ValidationError;
 import com.intellij.openapi.options.Configurable;
-import com.intellij.openapi.ui.ValidationInfo;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
-import util.CodeSmellLogger;
 
 import javax.swing.*;
 import java.util.Objects;
 
 /**
- * Provides controller functionality for application settings.
+ * Provides controller functionality for the settings.
  */
 final class DataClumpSettingsConfigurable implements Configurable {
 
+    /**
+     * The settings ui component
+     */
     private DataClumpSettingsUI mySettingsComponent;
-
-    // A default constructor with no arguments is required because
-    // this implementation is registered as an applicationConfigurable
 
     @Nls(capitalization = Nls.Capitalization.Title)
     @Override

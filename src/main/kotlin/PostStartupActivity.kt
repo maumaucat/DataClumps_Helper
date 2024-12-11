@@ -3,9 +3,14 @@ import util.Index
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 
+/**
+ * This class is used to execute some code after the project is loaded.
+ */
 class PostStartupActivity : ProjectActivity {
 
-
+    /**
+     * This method is called after the project is loaded. It is used to reset the index.
+     */
     override suspend fun execute(project: Project) {
         val dumbService = DumbService.getInstance(project)
 

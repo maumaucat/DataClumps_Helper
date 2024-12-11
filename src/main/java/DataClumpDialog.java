@@ -17,28 +17,20 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
-import util.CodeSmellLogger;
 import util.Index;
 import util.Property;
 import util.PsiUtil;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Dialog for the Data Clump Refactoring that allows the user to select which parameters or fields should be extracted
  * into a new class. The user can also choose to create a new class or use an existing one.
  */
 public class DataClumpDialog extends DialogWrapper {
-
-    private final String DATACLUMP_EXPLANATION = "Data Clumps are defined by <a href='https://martinfowler.com/bliki/DataClump.html'>Fowler</a> as a group of parameters " +
-            "or fields that appear together repeatedly at various places in the code, possibly in different orders." +
-            " These can be a sign that the code needs to be refactored. " +
-            "This refactoring allows you to extract these parameters or fields into a new class.";
 
     /**
      * List of properties that are part of the data clump.
@@ -161,6 +153,12 @@ public class DataClumpDialog extends DialogWrapper {
         panel.add(new JBLabel(info));
         JLabel tip = new JBLabel(IconLoader.getIcon("/icons/contextHelp.svg", getClass()));
         HelpTooltip helpTooltip = new HelpTooltip();
+
+        String DATACLUMP_EXPLANATION = "Data Clumps are defined by <a href='https://martinfowler.com/bliki/DataClump.html'>Fowler</a> as a group of parameters " +
+                "or fields that appear together repeatedly at various places in the code, possibly in different orders." +
+                " These can be a sign that the code needs to be refactored. " +
+                "This refactoring allows you to extract these parameters or fields into a new class.";
+
         helpTooltip.setDescription(DATACLUMP_EXPLANATION);
         helpTooltip.installOn(tip);
 
@@ -233,11 +231,7 @@ public class DataClumpDialog extends DialogWrapper {
             checkBox.setSelected(true);
             checkBox.addActionListener(e -> {
                 setClassSelection(refactoring.getUsableClasses(getProperties()));
-                if (existingComboBox.getItemCount() == 0) {
-                    existingClassButton.setEnabled(false);
-                } else {
-                    existingClassButton.setEnabled(true);
-                }
+                existingClassButton.setEnabled(existingComboBox.getItemCount() != 0);
             });
             checkBoxPanel.add(checkBox);
             this.propertySelections.put(property, checkBox);
@@ -366,7 +360,7 @@ public class DataClumpDialog extends DialogWrapper {
                 if (file.getName().endsWith(".ts")) {
                     List<JSClass> classes = PsiTreeUtil.getChildrenOfTypeAsList(file, JSClass.class);
                     for (JSClass psiClass : classes) {
-                        if (psiClass.getName().equals(className)) {
+                        if (Objects.equals(psiClass.getName(), className)) {
                             return new ValidationInfo("Class " + className + " already exists in directory " + directory.getName(), newClassNameField);
                         }
                     }
@@ -477,7 +471,4 @@ public class DataClumpDialog extends DialogWrapper {
         return this.newClassButton.isSelected();
     }
 
-    public String getDATACLUMP_EXPLANATION() {
-        return DATACLUMP_EXPLANATION;
-    }
 }
