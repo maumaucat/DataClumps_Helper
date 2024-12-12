@@ -480,6 +480,11 @@ public class PsiUtil {
      */
     public static void makeFieldOptional(TypeScriptField field) {
 
+        // Check if the field is already optional
+        if (field.getText().contains("?") || field.getText().contains("undefined")) {
+            return;
+        }
+
         ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
         JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
 
@@ -522,10 +527,16 @@ public class PsiUtil {
         assert virtualFile != null;
 
         PsiFile file = PsiManager.getInstance(dir.getProject()).findFile(virtualFile);
-        CodeSmellLogger.info("File: " + file);
-        CodeSmellLogger.info("valid " + file.isValid());
+        assert file != null;
 
-        return PsiTreeUtil.findChildOfType(file, TypeScriptClass.class);
+        for (TypeScriptClass clazz : PsiTreeUtil.findChildrenOfType(file, TypeScriptClass.class)) {
+            if (Objects.equals(clazz.getQualifiedName(), psiClass.getQualifiedName())) {
+                return clazz;
+            }
+        }
+
+        CodeSmellLogger.error("Class " + psiClass.getName() + " not found in file " + file.getName(), new Exception());
+        return null;
     }
 
     /**

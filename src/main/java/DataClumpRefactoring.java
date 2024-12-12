@@ -165,9 +165,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
             extractedClass = extractClass(targetDirectory, className, selectedProperties, optional);
             Index.addClass(extractedClass);
         } else {
+
             extractedClass = dialog.getSelectedClass();
             CodeSmellLogger.info("Using existing class " + extractedClass.getQualifiedName());
-
 
             // save the original parameters -> needed for refactoring the function calls
             List<Property> originalParameters = new ArrayList<>();
@@ -176,6 +176,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             }
 
             extractedClass = PsiUtil.makeClassExported(extractedClass);
+            assert extractedClass != null;
             Index.updateClass(extractedClass); // since the class was replaced the index must be updated
 
             adjustConstructor(extractedClass, selectedProperties, optional);
@@ -343,10 +344,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
                         // since the elements that contain the data clump do not have values for this parameter
                         optionalProperties.add(parameter);
                     } else if (!matchingProperties.contains(definingParameters.get(parameter))) {
+                        CodeSmellLogger.info("Optional parameter: " + parameter.getName());
                         // if the parameter is defining a classfield that is not a matching property
                         // -> add it to the optional properties
                         // since the elements that contain the data clump do not have values for this field
-                        optionalProperties.add(definingParameters.get(parameter));
+                        optionalProperties.add(parameter);
                     }
                 }
             }
@@ -358,8 +360,14 @@ public class DataClumpRefactoring implements LocalQuickFix {
                         ((Classfield) property).getModifier().contains("declare"))) continue;
 
                 if (!definedClassfields.containsKey(property)) {
-                    constructorFields.add(property);
-                    optionalProperties.add(property);
+                    // if there is another property already with the same name -> it is skipped to not make it even more complex
+                    if (constructorParameter.stream().anyMatch(field -> field.getName().equals(property.getName()))) {
+                        continue;
+                    } else {
+                        constructorFields.add(property);
+                        optionalProperties.add(property);
+                    }
+
                 }
             }
 
@@ -371,7 +379,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
             // make all optional defined fields optional
             for (Property optionalProperty : optionalProperties) {
-                PsiElement field = PsiUtil.getPsiField(psiClass, optionalProperty.getName());
+                Classfield classfield = definingParameters.get(optionalProperty);
+                if (classfield == null) continue;
+                PsiElement field = PsiUtil.getPsiField(psiClass,classfield);
                 if (field instanceof TypeScriptField) {
                     PsiUtil.makeFieldOptional((TypeScriptField) field);
                 }
@@ -379,6 +389,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
             // remove the constructor and create a new one with the adjusted parameters
             JSBlockStatement body = constructor.getBlock();
+
+            CodeSmellLogger.info("constructorfields: " + constructorFields);
+            CodeSmellLogger.info("optionalProperties: " + optionalProperties);
+            CodeSmellLogger.info("constructorParameter: " + constructorParameter);
 
             WriteCommandAction.runWriteCommandAction(psiClass.getProject(), constructor::delete);
             TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalProperties, constructorParameter, body, Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection);
@@ -850,14 +864,21 @@ public class DataClumpRefactoring implements LocalQuickFix {
      *                           in the form of properties in the right order.
      *                           This is the way their values will appear in the function call
      * @param extractedClass     the class that was extracted
-     * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class.
+     * @param originalDefinedClassfields the classfields that are defined in the constructor (by the parameters) of the class.
      *                           Only needed if the function is a constructor.
      * @param defaultValues      the default values of the classfields of the class.
      *                           Only needed if the function is a constructor.
      */
-    private void refactorFunctionCalls(TypeScriptFunction function, List<Property> originalParameters, TypeScriptClass extractedClass, @Nullable HashMap<Classfield, Parameter> definedClassfields, @Nullable HashMap<Classfield, String> defaultValues) {
+    private void refactorFunctionCalls(TypeScriptFunction function,
+                                       List<Property> originalParameters,
+                                       TypeScriptClass extractedClass,
+                                       @Nullable HashMap<Classfield, Parameter> originalDefinedClassfields,
+                                       @Nullable HashMap<Classfield, String> defaultValues) {
 
         List<Property> extractedParameters = getParametersAsPropertyList((TypeScriptFunction) Objects.requireNonNull(extractedClass.getConstructor()));
+        HashMap<Classfield, Parameter> extractedDefinedClassfields = new HashMap<>();
+        HashMap<Parameter, Classfield> extractedDefiningParameters = new HashMap<>();
+        getClassfieldDefiningParameter((TypeScriptFunction) extractedClass.getConstructor(), extractedDefiningParameters, extractedDefinedClassfields);
 
         for (PsiReference functionCall : ReferencesSearch.search(function)) {
 
@@ -867,33 +888,65 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
             // create the new argument list
             StringBuilder updatedArguments = new StringBuilder("(");
-            for (JSParameterListElement parameter : function.getParameters()) {
+
+            for (JSParameterListElement currentFunctionsPsiParameter : function.getParameters()) {
 
                 // if the next parameter expects the extracted class
                 // -> replace the argument with a constructor call for the extracted class
-                if (Objects.equals(parameter.getJSType(), extractedClass.getJSType())) {
+                if (Objects.equals(currentFunctionsPsiParameter.getJSType(), extractedClass.getJSType())) {
 
                     updatedArguments.append("new ").append(extractedClass.getName()).append("(");
-                    for (Property property : extractedParameters) {
+                    for (Property extractedClassProperty : extractedParameters) {
+                        if (!function.isConstructor()) {
 
-                        if (!function.isConstructor()) { // if the function is not a constructor -> all properties where defined
-                            int index = originalParameters.indexOf(property);
-                            if (index == -1) {
-                                CodeSmellLogger.error("Property " + property.getName() + " not found in original parameters", new IndexOutOfBoundsException());
-                                continue;
-                            }
-                            updatedArguments.append(originalArguments[index].getText()).append(", ");
-                        } else {
-                            assert definedClassfields != null;
-                            assert defaultValues != null;
-                            if (definedClassfields.containsKey(property)) { // if the property is defined in the constructor -> use the corresponding parameter
-                                int index = originalParameters.indexOf(definedClassfields.get(property));
+                            if (extractedClassProperty instanceof Classfield) {
+                                int index = originalParameters.indexOf(extractedClassProperty);
+                                if (index == -1) {
+                                    CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
+                                    continue;
+                                }
                                 updatedArguments.append(originalArguments[index].getText()).append(", ");
-                            } else if (defaultValues.containsKey(property)) { // if the property has a default value -> use the default value
-                                updatedArguments.append(defaultValues.get(property)).append(", ");
-                            } else { // if the property is not defined in the constructor and has no default value -> use undefined
-                                updatedArguments.append("undefined, ");
+                            } else if (extractedClassProperty instanceof Parameter) {
+                                Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
+                                int index = originalParameters.indexOf(definedClassfield);
+                                if (index == -1) {
+                                    CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
+                                    continue;
+                                }
+                                updatedArguments.append(originalArguments[index].getText()).append(", ");
                             }
+
+                        } else {
+                            // if the function is a constructor -> use the defined classfields and default values
+
+                            assert originalDefinedClassfields != null;
+                            assert defaultValues != null;
+
+                            if (extractedClassProperty instanceof Classfield) {
+
+                                if (originalDefinedClassfields.containsKey(extractedClassProperty)) { // if the property is defined in the constructor -> use the corresponding parameter
+                                    int index = originalParameters.indexOf(originalDefinedClassfields.get(extractedClassProperty));
+                                    updatedArguments.append(originalArguments[index].getText()).append(", ");
+                                } else if (defaultValues.containsKey(extractedClassProperty)) { // if the property has a default value -> use the default value
+                                    updatedArguments.append(defaultValues.get(extractedClassProperty)).append(", ");
+                                } else { // if the property is not defined in the constructor and has no default value -> use undefined
+                                    updatedArguments.append("undefined, ");
+                                }
+
+                            } else if (extractedClassProperty instanceof Parameter) {
+                                Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
+
+                                if (originalDefinedClassfields.containsKey(definedClassfield)) { // if the property is defined in the constructor -> use the corresponding parameter
+                                    int index = originalParameters.indexOf(originalDefinedClassfields.get(definedClassfield));
+                                    updatedArguments.append(originalArguments[index].getText()).append(", ");
+                                } else if (defaultValues.containsKey(definedClassfield)) { // if the property has a default value -> use the default value
+                                    updatedArguments.append(defaultValues.get(definedClassfield)).append(", ");
+                                } else { // if the property is not defined in the constructor and has no default value -> use undefined
+                                    updatedArguments.append("undefined, ");
+                                }
+                            }
+
+
                         }
                     }
                     // Remove trailing comma
@@ -903,7 +956,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     updatedArguments.append(")");
                 } else {
                     // Append original arguments
-                    updatedArguments.append(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) parameter))].getText());
+                    updatedArguments.append(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) currentFunctionsPsiParameter))].getText());
                 }
                 updatedArguments.append(", ");
             }
@@ -931,9 +984,14 @@ public class DataClumpRefactoring implements LocalQuickFix {
      */
     private List<Property> getParametersAsPropertyList(TypeScriptFunction function) {
         List<Property> parameters = new ArrayList<>();
-        for (JSParameterListElement parameter : function.getParameters()) {
-            Property property = new Parameter((TypeScriptParameter) parameter);
-            parameters.add(property);
+        for (JSParameterListElement psiParameter : function.getParameters()) {
+            if (PsiUtil.isParameterField((TypeScriptParameter) psiParameter)) {
+                Classfield field = new Classfield((TypeScriptParameter) psiParameter);
+                parameters.add(field);
+            } else {
+                Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
+                parameters.add(parameter);
+            }
         }
         return parameters;
     }
