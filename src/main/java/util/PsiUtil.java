@@ -404,7 +404,6 @@ public class PsiUtil {
         // Insert the field
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             psiClass.addBefore(field, insertBefore);
-            CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
         });
 
     }
@@ -427,7 +426,6 @@ public class PsiUtil {
                 psiClass.addBefore(function, psiClass.getLastChild());
             }
 
-            CodeStyleManager.getInstance(psiClass.getProject()).reformat(psiClass);
         });
     }
 
@@ -517,7 +515,6 @@ public class PsiUtil {
 
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             psiClass.replace(newClass);
-            CodeStyleManager.getInstance(newClass.getProject()).reformat(newClass);
         });
 
         // this is for some reason necessary to get the virtual file later on
@@ -660,15 +657,21 @@ public class PsiUtil {
      */
     public static List<PsiElement> getPsiFields(JSClass psiClass) {
 
+        List<PsiElement> fields = new ArrayList<>();
+
         // add all FieldStatements
-        List<PsiElement> fields = new ArrayList<>(Arrays.asList(psiClass.getFields()));
+        for (JSField field : psiClass.getFields()) {
+            if (field.getName() == null || field.getJSType() == null) continue;
+            fields.add(field);
+        }
 
         // iterate constructor Parameter
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
         if (constructor != null) {
             for (JSParameterListElement psiParameter : constructor.getParameters()) {
                 // test if parameter is actually field
-                if (isParameterField((TypeScriptParameter) psiParameter)) {
+                // filter out unfinished fields
+                if (isParameterField((TypeScriptParameter) psiParameter) && psiParameter.getName() != null && psiParameter.getJSType() != null) {
                     fields.add(psiParameter);
                 }
             }

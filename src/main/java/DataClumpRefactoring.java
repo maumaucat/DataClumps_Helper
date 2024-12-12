@@ -15,6 +15,7 @@ import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
@@ -190,9 +191,19 @@ public class DataClumpRefactoring implements LocalQuickFix {
             refactorFunctionCalls((TypeScriptFunction) extractedClass.getConstructor(), originalParameters, extractedClass, definedClassfields, defaultValues);
         }
 
+        TypeScriptClass finalExtractedClass = extractedClass;
+        WriteCommandAction.runWriteCommandAction(project, () -> {
+            CodeStyleManager.getInstance(project).reformat(finalExtractedClass);
+        });
+
         // refactor the elements that contain the data clump
         refactorElement(currentElement, extractedClass, selectedProperties, currentDefinedClassFields, currentDefaultValues);
         refactorElement(otherElement, extractedClass, selectedProperties, otherDefinedClassFields, otherDefaultValues);
+
+        WriteCommandAction.runWriteCommandAction(project, () -> {
+            CodeStyleManager.getInstance(project).reformat(currentElement);
+            CodeStyleManager.getInstance(project).reformat(otherElement);
+        });
 
     }
 
