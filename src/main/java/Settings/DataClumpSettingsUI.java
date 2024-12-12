@@ -5,6 +5,7 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.FormBuilder;
+
 import javax.swing.*;
 import java.awt.*;
 import java.util.Objects;
@@ -19,7 +20,6 @@ public class DataClumpSettingsUI {
     private final ComboBox<Integer> numberOfProperties;
     private final JCheckBox includeModifiersInDetection = new JCheckBox("Include Modifiers in Detection");
     private final JCheckBox includeModifiersInExtractedClass = new JCheckBox("Include Modifiers in Extracted Class");
-
 
 
     /**
@@ -70,7 +70,7 @@ public class DataClumpSettingsUI {
      * Adds a help tooltip to a component. The tooltip is displayed when hovering over the help icon.
      *
      * @param component The component to add the tooltip to
-     * @param text The text of the tooltip
+     * @param text      The text of the tooltip
      * @return The component with the tooltip
      */
     private JComponent addHelpToolTip(JComponent component, String text) {
@@ -89,7 +89,7 @@ public class DataClumpSettingsUI {
 
 
     public void setNumberOfProperties(int value) {
-       numberOfProperties.setSelectedItem(String.valueOf(value));
+        numberOfProperties.setSelectedItem(String.valueOf(value));
     }
 
     public int getNumberOfProperties() {

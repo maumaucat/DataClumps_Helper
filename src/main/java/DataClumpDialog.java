@@ -71,9 +71,9 @@ public class DataClumpDialog extends DialogWrapper {
      * Creates a new DataClumpDialog.
      *
      * @param refactoring the refactoring quickfix
-     * @param matching the list of properties that are part of the data clump
-     * @param current the first element that is part of the data clump
-     * @param other the second element that is part of the data clump
+     * @param matching    the list of properties that are part of the data clump
+     * @param current     the first element that is part of the data clump
+     * @param other       the second element that is part of the data clump
      */
     public DataClumpDialog(DataClumpRefactoring refactoring, List<Property> matching, PsiElement current, PsiElement other) {
         super(true);
@@ -117,7 +117,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Adds the radio buttons to the dialog panel. The user can choose to create a new class or use an existing one.
      *
      * @param panel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc   the grid bag constraints
      */
     private void addRadioButtons(JPanel panel, GridBagConstraints gbc) {
         JRadioButton newClassRadioButton = new JRadioButton("Create new Class");
@@ -144,7 +144,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Adds the info panel to the dialog panel. The info panel contains a description of the refactoring.
      *
      * @param dialogPanel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc         the grid bag constraints
      */
     private void addInfoPanel(JPanel dialogPanel, GridBagConstraints gbc) {
         String info = "Refactoring Data Clump between " + PsiUtil.getName(current) + " and " + PsiUtil.getName(other);
@@ -175,7 +175,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Adds the input field for the new class name to the dialog panel.
      *
      * @param panel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc   the grid bag constraints
      */
     private void addNewClassInput(JPanel panel, GridBagConstraints gbc) {
         this.newClassLabel = new JLabel("Enter Class Name:");
@@ -194,7 +194,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Adds the directory browser to the dialog panel. The user can choose the target directory for the new class.
      *
      * @param panel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc   the grid bag constraints
      */
     private void addDirectoryBrowser(JPanel panel, GridBagConstraints gbc) {
         TextFieldWithBrowseButton directoryBrowseButton = new TextFieldWithBrowseButton();
@@ -221,7 +221,7 @@ public class DataClumpDialog extends DialogWrapper {
      * into the new class.
      *
      * @param panel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc   the grid bag constraints
      */
     private void addCheckBoxPanel(JPanel panel, GridBagConstraints gbc) {
         JLabel checkBoxLabel = new JLabel("Choose which parameters or fields should be extracted into the new class:");
@@ -267,7 +267,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Adds listener to the radio buttons to switch between creating a new class and using an existing one.
      *
      * @param panel the dialog panel
-     * @param gbc the grid bag constraints
+     * @param gbc   the grid bag constraints
      */
     private void configureRadioButtonActions(JPanel panel, GridBagConstraints gbc) {
         this.newClassButton.addActionListener(e -> {
@@ -321,6 +321,7 @@ public class DataClumpDialog extends DialogWrapper {
 
     /**
      * Returns with the preferred focused component.
+     *
      * @return the preferred focused component
      */
     @Override
@@ -341,7 +342,7 @@ public class DataClumpDialog extends DialogWrapper {
         if (shouldCreateNewClass()) {
             // check if directory is valid
             PsiDirectory directory = getDirectory();
-            if ( directory == null ) {
+            if (directory == null) {
                 return new ValidationInfo("Invalid directory Selected", this.directoryBrowseButton);
             }
 
@@ -395,7 +396,7 @@ public class DataClumpDialog extends DialogWrapper {
      * Checks if the class name is already imported in the file.
      *
      * @param className the class name
-     * @param file the file
+     * @param file      the file
      * @return true if the class name is already imported in the file, false otherwise
      */
     private boolean isImported(String className, PsiFile file) {

@@ -10,6 +10,7 @@ import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import Settings.DataClumpSettings;
+
 import java.util.*;
 
 /**
@@ -22,7 +23,8 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     /**
      * Build the visitor for the inspection
-     * @param holder the problems holder
+     *
+     * @param holder     the problems holder
      * @param isOnTheFly if the inspection is on the fly
      * @return the visitor
      */
@@ -78,7 +80,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      * Detect data clumps in the current element
      *
      * @param currentElement the current element
-     * @param holder the problems holder
+     * @param holder         the problems holder
      */
     public void detectDataClump(PsiElement currentElement, ProblemsHolder holder) {
 
@@ -97,8 +99,8 @@ public class DataClumpDetection extends LocalInspectionTool {
      * Process the potential data clumps and mark them as data clumps if they meet the required conditions
      *
      * @param potentialDataClumps the potential data clumps
-     * @param holder the problems holder
-     * @param currentElement the current element
+     * @param holder              the problems holder
+     * @param currentElement      the current element
      */
     private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement) {
 
@@ -129,7 +131,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                         assert dataClumpElement != null;
 
                         holder.registerProblem(dataClumpElement, "Data Clump with " + PsiUtil.getName(otherElement) +
-                               ". Matching Properties " + matchingProperties + ".", new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
+                                ". Matching Properties " + matchingProperties + ".", new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
 
                     }
                 }
@@ -143,7 +145,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      *
      * @param currentClass the current class
      * @return the potential data clumps for the class. The key is the other class or function
-     *         and the value is the matching properties with the current class
+     * and the value is the matching properties with the current class
      */
     private HashMap<PsiElement, List<Property>> calculatePotentialDataClumpsForClass(TypeScriptClass currentClass) {
 
@@ -180,7 +182,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      *
      * @param currentFunction the current function
      * @return the potential data clumps for the function. The key is the other class or function
-     *        and the value is the matching properties with the current function
+     * and the value is the matching properties with the current function
      */
     private HashMap<PsiElement, List<Property>> calculatePotentialDataClumpsForFunction(TypeScriptFunction currentFunction) {
 
@@ -193,7 +195,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                     potentialDataClumps.put(otherFunction, new ArrayList<>());
                 }
                 potentialDataClumps.get(otherFunction).add(parameter);
-               }
+            }
 
             if (!Index.getPropertiesToClasses().containsKey(parameter)) continue;
             for (TypeScriptClass otherClass : new ArrayList<>(Index.getPropertiesToClasses().get(parameter))) {
@@ -249,7 +251,7 @@ public class DataClumpDetection extends LocalInspectionTool {
     /**
      * Check if the class and function should be compared for data clumps
      *
-     * @param function the function
+     * @param function        the function
      * @param TypeScriptClass the class
      * @return true if the class and function should be compared, false otherwise
      */
@@ -280,7 +282,8 @@ public class DataClumpDetection extends LocalInspectionTool {
         JSClass class1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
         JSClass class2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
 
-        if (class1 == null || class2 == null | class1 == class2 || !Objects.equals(function1.getName(), function2.getName())) return false;
+        if (class1 == null || class2 == null | class1 == class2 || !Objects.equals(function1.getName(), function2.getName()))
+            return false;
 
         List<JSClass> common = getCommonClassesInHierarchy(class1, class2);
         for (JSClass commonClass : common) {

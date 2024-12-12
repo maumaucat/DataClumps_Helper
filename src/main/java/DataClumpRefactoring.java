@@ -32,7 +32,7 @@ import java.util.*;
 public class DataClumpRefactoring implements LocalQuickFix {
 
     /**
-     *  List of properties that are always used together
+     * List of properties that are always used together
      */
     private final List<Property> matchingProperties;
     /**
@@ -73,8 +73,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Creates a new DataClumpRefactoring.
      *
-     * @param currentElement the first element that contains the data clump
-     * @param otherElement the second element that contains the data clump
+     * @param currentElement     the first element that contains the data clump
+     * @param otherElement       the second element that contains the data clump
      * @param matchingProperties the properties that are always used together
      */
     public DataClumpRefactoring(@NotNull PsiElement currentElement, @NotNull PsiElement otherElement, @NotNull List<Property> matchingProperties) {
@@ -114,7 +114,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * If the user selects to create a new class, a new class is created and the properties are extracted.
      * If the user selects an existing class, the properties are extracted and added to the existing class.
      *
-     * @param project the current project
+     * @param project           the current project
      * @param problemDescriptor the problem descriptor
      */
     @Override
@@ -186,7 +186,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             HashMap<Classfield, Parameter> definedClassfields = new HashMap<>();
             HashMap<Classfield, String> defaultValues = new HashMap<>();
             getDefaultValues(extractedClass, selectedProperties, defaultValues);
-            getClassfieldDefiningParameter(constructor, new HashMap<>(), definedClassfields );
+            getClassfieldDefiningParameter(constructor, new HashMap<>(), definedClassfields);
             refactorFunctionCalls((TypeScriptFunction) extractedClass.getConstructor(), originalParameters, extractedClass, definedClassfields, defaultValues);
         }
 
@@ -199,9 +199,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Creates a new class with the given name in the given directory and extracts the given properties as fields.
      *
-     * @param dir the directory in which the class should be created
-     * @param className the name of the class
-     * @param fields the properties that should be extracted as fields
+     * @param dir            the directory in which the class should be created
+     * @param className      the name of the class
+     * @param fields         the properties that should be extracted as fields
      * @param optionalFields the properties that are optional
      * @return the created class
      */
@@ -235,12 +235,12 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // add abstract fields
         for (Property field : abstractFields) {
-            ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield)field).getModifier(), false, null);
+            ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getModifier(), false, null);
             PsiUtil.addFieldToClass(psiClass, abstractField);
         }
         // add declared fields
         for (Property field : declaredFields) {
-            ES6FieldStatementImpl declaredField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield)field).getModifier(), false, null);
+            ES6FieldStatementImpl declaredField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getModifier(), false, null);
             PsiUtil.addFieldToClass(psiClass, declaredField);
         }
 
@@ -286,11 +286,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Adjusts the constructor of the given class to include the extracted properties
      * and make sure all Parameter that might not have a value are optional.
      *
-     * @param psiClass the class to adjust the constructor of
+     * @param psiClass           the class to adjust the constructor of
      * @param matchingProperties the properties that are extracted
      * @param optionalProperties the properties that are optional
      */
-    private void adjustConstructor(TypeScriptClass psiClass , List<Property> matchingProperties, Set<Property> optionalProperties) {
+    private void adjustConstructor(TypeScriptClass psiClass, List<Property> matchingProperties, Set<Property> optionalProperties) {
 
         CodeSmellLogger.info("Adjusting constructor of " + psiClass.getQualifiedName() + "...");
 
@@ -344,7 +344,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             for (Property property : matchingProperties) {
                 // skip abstract fields or declared fields
                 if (property instanceof Classfield && (((Classfield) property).getModifier().contains("abstract") ||
-                        ((Classfield) property).getModifier().contains("declare") )) continue;
+                        ((Classfield) property).getModifier().contains("declare"))) continue;
 
                 if (!definedClassfields.containsKey(property)) {
                     constructorFields.add(property);
@@ -380,7 +380,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Gets for the given function the parameters mapped to the classfields they define in the function as well as
      * the classfields mapped to the parameters that define them in the function.
      *
-     * @param function the function to get the defining parameters and defined classfields for
+     * @param function           the function to get the defining parameters and defined classfields for
      * @param definingParameters the map to store the defining parameters
      * @param definedClassfields the map to store the defined classfields
      */
@@ -415,8 +415,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Gets all the default values of the properties of the given class.
      *
-     * @param psiClass the class to get the default values for
-     * @param properties the properties to get the default values for
+     * @param psiClass      the class to get the default values for
+     * @param properties    the properties to get the default values for
      * @param defaultValues the map to store the default values mapped to the properties
      */
     private void getDefaultValues(TypeScriptClass psiClass, List<Property> properties, HashMap<Classfield, String> defaultValues) {
@@ -425,7 +425,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         List<Classfield> classfields = Index.getClassesToClassFields().get(psiClass);
 
-        for (Classfield classfield : classfields)  {
+        for (Classfield classfield : classfields) {
             if (properties.contains(classfield)) {
                 PsiElement psiField = PsiUtil.getPsiField(psiClass, classfield);
                 assert psiField != null;
@@ -468,10 +468,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * A property is optional if it is not defined in the constructor of the class or has a default value.
      * All properties that get assigned an optional property are also optional.
      *
-     * @param properties the properties to check
-     * @param psiClass the class to check the properties for
+     * @param properties         the properties to check
+     * @param psiClass           the class to check the properties for
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class
-     * @param defaultValues the default values of the classfields of the class
+     * @param defaultValues      the default values of the classfields of the class
      * @param definingParameters the parameters that define the classfields in the constructor
      * @return the optional properties
      */
@@ -520,9 +520,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Adds getter and setter to the extracted class for the given properties if they do not already exist.
      *
-     * @param psiClass the class to add the getter and setter to
+     * @param psiClass   the class to add the getter and setter to
      * @param properties the properties to add the getter and setter for
-     * @param optional the optional properties
+     * @param optional   the optional properties
      */
     private void addGetterAndSetter(TypeScriptClass psiClass, List<Property> properties, Set<Property> optional) {
         for (Property property : properties) {
@@ -571,9 +571,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Gets the String representation of the default initialization of the extracted class
      * that uses the default values of the classfields.
      *
-     * @param psiClass the class that contains the data clump
+     * @param psiClass       the class that contains the data clump
      * @param extractedClass the class that contains the extracted properties
-     * @param defaultValues the default values of the classfields of the class
+     * @param defaultValues  the default values of the classfields of the class
      * @return the default initialization of the extracted class
      */
     private String getDefaultInit(TypeScriptClass psiClass, TypeScriptClass extractedClass, HashMap<Classfield, String> defaultValues) {
@@ -605,11 +605,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Refactors the given element by adding the extracted class as a field or parameter depending on the type of the element.
      *
-     * @param element the element that contains the data clump to be refactored
-     * @param extractedClass the class that contains the extracted properties
-     * @param properties the properties that are extracted
+     * @param element            the element that contains the data clump to be refactored
+     * @param extractedClass     the class that contains the extracted properties
+     * @param properties         the properties that are extracted
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the element
-     * @param defaultValues the default values of the classfields of the element
+     * @param defaultValues      the default values of the classfields of the element
      */
     private void refactorElement(PsiElement element, TypeScriptClass extractedClass, List<Property> properties, HashMap<Classfield, Parameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
 
@@ -628,7 +628,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     /**
      * Adds an import statement for the extracted class to the element if it is not already imported.
-     * @param element the element to which the import statement should be added
+     *
+     * @param element        the element to which the import statement should be added
      * @param extractedClass the class that should be imported
      */
     private void addImport(PsiElement element, TypeScriptClass extractedClass) {
@@ -663,16 +664,16 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * The constructor calls are updated to use the extracted class instead of the extracted properties.
      * The field references are updated to use the extracted class instead of the extracted properties.
      *
-     * @param psiClass the class that contains the data clump
-     * @param extractedClass the class that contains the extracted properties
-     * @param properties the properties that are extracted
+     * @param psiClass           the class that contains the data clump
+     * @param extractedClass     the class that contains the extracted properties
+     * @param properties         the properties that are extracted
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class
-     * @param defaultValues the default values of the classfields of the class
+     * @param defaultValues      the default values of the classfields of the class
      */
     private void refactorClass(TypeScriptClass psiClass, TypeScriptClass extractedClass, List<Property> properties, HashMap<Classfield, Parameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
         CodeSmellLogger.info("Refactoring class " + psiClass.getQualifiedName() + "...");
 
-        String fieldName =  "my_" + Objects.requireNonNull(extractedClass.getName()).toLowerCase(); // this should be a unique name
+        String fieldName = "my_" + Objects.requireNonNull(extractedClass.getName()).toLowerCase(); // this should be a unique name
 
         // add the extracted class as a field
         ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
@@ -693,9 +694,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Updates the field references of the given class by replacing the extracted properties
      * with getter and setter calls on the extracted class.
-     * @param psiClass the class that contains the data clump
+     *
+     * @param psiClass   the class that contains the data clump
      * @param properties the properties that are extracted
-     * @param fieldName the name of the field that contains the extracted class
+     * @param fieldName  the name of the field that contains the extracted class
      */
     private void updateFieldReferences(TypeScriptClass psiClass, List<Property> properties, String fieldName) {
 
@@ -736,12 +738,12 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Updates the constructor of the given class to use the extracted class as a parameter instead of the extracted properties.
      * The constructor calls are updated to use the extracted class instead of the extracted properties.
      *
-     * @param psiClass the class that contains the data clump
-     * @param properties the properties that are extracted
-     * @param extractedClass the class that contains the extracted properties
-     * @param fieldName the name of the field that contains the extracted class
+     * @param psiClass           the class that contains the data clump
+     * @param properties         the properties that are extracted
+     * @param extractedClass     the class that contains the extracted properties
+     * @param fieldName          the name of the field that contains the extracted class
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class
-     * @param defaultValues the default values of the classfields of the class
+     * @param defaultValues      the default values of the classfields of the class
      */
     private void updateConstructor(TypeScriptClass psiClass, List<Property> properties, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, Parameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
 
@@ -792,10 +794,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * or define a field that is part of the extracted properties. The references to the parameters are replaced
      * with getter calls on the extracted class.
      *
-     * @param constructor the constructor to refactor
+     * @param constructor        the constructor to refactor
      * @param matchingProperties the properties that are extracted
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class
-     * @param newParameterName the name of the new parameter object
+     * @param newParameterName   the name of the new parameter object
      */
     private void refactorConstructorParameter(TypeScriptFunction constructor, List<Property> matchingProperties, HashMap<Classfield, Parameter> definedClassfields, String newParameterName) {
         // iterate over all properties that are defined in the constructor
@@ -817,8 +819,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     /**
      * Adds the extracted class as a parameter to the given function.
-     * @param function the function to which the parameter should be added
-     * @param extractedClass the class that should be added as a parameter
+     *
+     * @param function         the function to which the parameter should be added
+     * @param extractedClass   the class that should be added as a parameter
      * @param newParameterName the name of the new parameter
      */
     private void addClassAsParameter(TypeScriptFunction function, TypeScriptClass extractedClass, String newParameterName) {
@@ -831,15 +834,15 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Refactors the function calls to match the new function signature after the extracted class was added as a parameter.
      *
-     * @param function the function to refactor
+     * @param function           the function to refactor
      * @param originalParameters the original parameters of the function before the refactoring
      *                           in the form of properties in the right order.
      *                           This is the way their values will appear in the function call
-     * @param extractedClass the class that was extracted
+     * @param extractedClass     the class that was extracted
      * @param definedClassfields the classfields that are defined in the constructor (by the parameters) of the class.
      *                           Only needed if the function is a constructor.
-     * @param defaultValues the default values of the classfields of the class.
-     *                      Only needed if the function is a constructor.
+     * @param defaultValues      the default values of the classfields of the class.
+     *                           Only needed if the function is a constructor.
      */
     private void refactorFunctionCalls(TypeScriptFunction function, List<Property> originalParameters, TypeScriptClass extractedClass, @Nullable HashMap<Classfield, Parameter> definedClassfields, @Nullable HashMap<Classfield, String> defaultValues) {
 
@@ -875,8 +878,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                             if (definedClassfields.containsKey(property)) { // if the property is defined in the constructor -> use the corresponding parameter
                                 int index = originalParameters.indexOf(definedClassfields.get(property));
                                 updatedArguments.append(originalArguments[index].getText()).append(", ");
-                            }
-                            else if (defaultValues.containsKey(property)) { // if the property has a default value -> use the default value
+                            } else if (defaultValues.containsKey(property)) { // if the property has a default value -> use the default value
                                 updatedArguments.append(defaultValues.get(property)).append(", ");
                             } else { // if the property is not defined in the constructor and has no default value -> use undefined
                                 updatedArguments.append("undefined, ");
@@ -930,9 +932,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * The extracted fields are replaced with a field of the extracted class.
      * The function calls are updated to use the extracted class instead of the extracted properties.
      *
-     * @param psiFunction the function that contains the data clump
+     * @param psiFunction    the function that contains the data clump
      * @param extractedClass the class that contains the extracted properties
-     * @param properties the properties that are extracted
+     * @param properties     the properties that are extracted
      */
     private void refactorFunction(TypeScriptFunction psiFunction, TypeScriptClass extractedClass, List<Property> properties) {
         CodeSmellLogger.info("Refactoring function " + psiFunction.getQualifiedName() + "...");
@@ -958,8 +960,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Deletes all parameters from the function that are part of the extracted properties
      * and replaces the references to the parameters with getter calls on the extracted class.
      *
-     * @param function the function to refactor
-     * @param properties the properties that are extracted
+     * @param function         the function to refactor
+     * @param properties       the properties that are extracted
      * @param newParameterName the name of the new parameter object
      */
     private void refactorFunctionParameter(TypeScriptFunction function, List<Property> properties, String newParameterName) {
@@ -986,9 +988,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Replaces the given assignment with a setter call on the extracted class.
      *
-     * @param psiClass the class that contains the data clump
-     * @param assignment the assignment to replace
-     * @param fieldName the name of the field that contains the extracted class
+     * @param psiClass     the class that contains the data clump
+     * @param assignment   the assignment to replace
+     * @param fieldName    the name of the field that contains the extracted class
      * @param propertyName the name of the property that is assigned
      */
     private void replaceAssignmentWithSetter(TypeScriptClass psiClass, JSAssignmentExpression assignment, String fieldName, String propertyName) {
@@ -1009,9 +1011,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Replaces the given reference with a getter call on the extracted class.
      *
-     * @param psiClass the class that contains the data clump
-     * @param reference the reference to replace
-     * @param fieldName the name of the field that contains the extracted class
+     * @param psiClass     the class that contains the data clump
+     * @param reference    the reference to replace
+     * @param fieldName    the name of the field that contains the extracted class
      * @param propertyName the name of the property that is referenced
      */
     private void replaceReferenceWithGetter(TypeScriptClass psiClass, PsiReference reference, String fieldName, String propertyName) {
@@ -1019,7 +1021,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         if (PsiTreeUtil.getParentOfType(reference.getElement(), TypeScriptClass.class) == psiClass) {
             expressionText = "this." + fieldName + "." + propertyName;
         } else {
-            expressionText = reference.getElement().getFirstChild().getText() +  "." + fieldName + "." + propertyName;
+            expressionText = reference.getElement().getFirstChild().getText() + "." + fieldName + "." + propertyName;
         }
 
         JSExpression newExpression = JSPsiElementFactory.createJSExpression(expressionText, reference.getElement());
@@ -1037,59 +1039,60 @@ public class DataClumpRefactoring implements LocalQuickFix {
     public Set<TypeScriptClass> getUsableClasses(List<Property> properties) {
         Set<TypeScriptClass> matchingClasses = new HashSet<>();
 
-        // Validierung: Keine Properties angegeben
-        if (properties.isEmpty()) CodeSmellLogger.error("No properties specified for DataClumpRefactoring", new IllegalArgumentException());
+        // validate properties
+        if (properties.isEmpty())
+            CodeSmellLogger.error("No properties specified for DataClumpRefactoring", new IllegalArgumentException());
 
-
-        // Validierung: Erste Property nicht im Index
         Property firstProperty = properties.get(0);
 
         if (!Index.getPropertiesToClasses().containsKey(firstProperty)) return matchingClasses;
 
-        // Potenziell passende Klassen finden
+        // find all classes that contain all properties
         List<TypeScriptClass> potentialClasses = Index.getPropertiesToClasses().get(firstProperty);
         for (TypeScriptClass psiClass : potentialClasses) {
             if (!psiClass.isValid() || psiClass.getName() == null) continue;
             if (PsiUtil.hasAll(psiClass, properties)) matchingClasses.add(psiClass);
         }
 
-        // Kopie des Sets erstellen, da wir es modifizieren
+        // filter classes that have the properties assigned in the constructor
         Set<TypeScriptClass> filteredClasses = new HashSet<>(matchingClasses);
 
-        // Überprüfung der Zuweisungen für jede Klasse
         for (TypeScriptClass psiClass : matchingClasses) {
             for (Property property : properties) {
+                CodeSmellLogger.info("Trying to get field " + property.getName() + " in class " + psiClass.getQualifiedName());
                 PsiElement psiField = PsiUtil.getPsiField(psiClass, property.getName());
                 assert psiField != null;
 
                 TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
                 if (constructor == null) break;
 
-                // Referenzen des Properties überprüfen
+                // check if the property is assigned in the constructor
                 for (PsiReference reference : ReferencesSearch.search(psiField)) {
 
-                    // Sicherstellen, dass die Referenz im Konstruktor liegt
-                    if (PsiTreeUtil.getParentOfType(reference.getElement(), TypeScriptFunction.class) != constructor) break;
+                    // check if the reference is in the constructor
+                    if (PsiTreeUtil.getParentOfType(reference.getElement(), TypeScriptFunction.class) != constructor)
+                        break;
 
-                    // Überprüfen, ob die Referenz in einer Zuweisung verwendet wird
+                    // check if the reference is an assignment
                     JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
-                    if (assignment == null || Objects.requireNonNull(assignment.getLOperand()).getFirstChild() != reference) break;
+                    if (assignment == null || Objects.requireNonNull(assignment.getLOperand()).getFirstChild() != reference)
+                        break;
 
 
-                    // Überprüfung des rechten Operanden der Zuweisung
+                    // check if the right operand is a reference expression
                     if (!(assignment.getROperand() instanceof JSReferenceExpression)) {
                         filteredClasses.remove(psiClass);
                         break;
                     }
 
-                    // Aufgelöste Property überprüfen
+                    // check if the right operand is a property
                     Property assignedProperty = PsiUtil.resolveProperty((JSReferenceExpression) assignment.getROperand());
                     if (assignedProperty == null) {
                         filteredClasses.remove(psiClass);
                         break;
                     }
 
-                    // Klassenfeld-Parameter-Mapping überprüfen
+                    // check if the assigned property is the same as the property
                     HashMap<Parameter, Classfield> definingParameter = new HashMap<>();
                     getClassfieldDefiningParameter(constructor, definingParameter, new HashMap<>());
 
@@ -1107,6 +1110,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
     /**
      * Returns whether the quick fix should start in a write action.
+     *
      * @return false since the quick fix uses a dialog to gather user input
      */
     @Override

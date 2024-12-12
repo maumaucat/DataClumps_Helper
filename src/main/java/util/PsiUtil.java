@@ -1,4 +1,5 @@
 package util;
+
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.*;
@@ -27,11 +28,11 @@ public class PsiUtil {
     /**
      * Creates a new field statement in the given context.
      *
-     * @param context The context in which the field statement should be created.
-     * @param name The name of the field.
-     * @param type The type of the field.
-     * @param modifiers The modifiers of the field.
-     * @param optional Whether the field is optional.
+     * @param context      The context in which the field statement should be created.
+     * @param name         The name of the field.
+     * @param type         The type of the field.
+     * @param modifiers    The modifiers of the field.
+     * @param optional     Whether the field is optional.
      * @param defaultValue The default value of the field.
      **/
     public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, List<String> modifiers, boolean optional, String defaultValue) {
@@ -61,7 +62,7 @@ public class PsiUtil {
         classCode.append("}\n");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         return PsiTreeUtil.getChildOfType(psiClass, ES6FieldStatementImpl.class);
@@ -71,8 +72,8 @@ public class PsiUtil {
      * Creates a new parameter in the given context.
      *
      * @param context The context in which the parameter should be created.
-     * @param name The name of the parameter.
-     * @param type The type of the parameter.
+     * @param name    The name of the parameter.
+     * @param type    The type of the parameter.
      * @return The created parameter.
      */
     public static TypeScriptParameter createTypeScriptParameter(PsiElement context, String name, JSType type) {
@@ -85,7 +86,7 @@ public class PsiUtil {
         functionCode.append(") {}");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
         TypeScriptFunction psiFunction = PsiTreeUtil.getChildOfType(psiFile, TypeScriptFunction.class);
 
         assert psiFunction != null;
@@ -96,7 +97,7 @@ public class PsiUtil {
     /**
      * Creates a new parameter list in the given context.
      *
-     * @param context The context in which the parameter list should be created.
+     * @param context    The context in which the parameter list should be created.
      * @param parameters The parameters of the parameter list.
      * @return The created parameter list.
      */
@@ -116,7 +117,7 @@ public class PsiUtil {
         functionCode.append(") {}");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode);
         TypeScriptFunction psiFunction = PsiTreeUtil.getChildOfType(psiFile, TypeScriptFunction.class);
 
         assert psiFunction != null;
@@ -127,7 +128,7 @@ public class PsiUtil {
     /**
      * Creates a getter function in the given context for the given property.
      *
-     * @param context The context in which the getter should be created.
+     * @param context  The context in which the getter should be created.
      * @param property The property for which the getter should return the value.
      * @param optional Whether the property is optional.
      * @return The created getter function.
@@ -152,7 +153,7 @@ public class PsiUtil {
         classCode.append("}\n");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         assert psiClass != null;
@@ -163,7 +164,7 @@ public class PsiUtil {
     /**
      * Creates a setter function in the given context for the given property.
      *
-     * @param context The context in which the setter should be created.
+     * @param context  The context in which the setter should be created.
      * @param property The property for which the setter should set the value.
      * @param optional Whether the property is optional.
      * @return The created setter function.
@@ -187,7 +188,7 @@ public class PsiUtil {
         classCode.append("}\n");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass psiClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         assert psiClass != null;
@@ -198,10 +199,10 @@ public class PsiUtil {
     /**
      * Creates a new class in the given context.
      *
-     * @param context The context in which the class should be created.
-     * @param className The name of the class.
+     * @param context       The context in which the class should be created.
+     * @param className     The name of the class.
      * @param abstractClass Whether the class should be abstract.
-     * @param export Whether the class should be exported.
+     * @param export        Whether the class should be exported.
      * @return The created class.
      */
     public static TypeScriptClass createClass(PsiElement context, String className, boolean abstractClass, boolean export) {
@@ -219,7 +220,7 @@ public class PsiUtil {
         classText.append("class ").append(className).append(" {\n}\n");
 
         PsiFile psiFile = PsiFileFactory.getInstance(context.getProject())
-                .createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classText);
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classText);
 
         return PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
     }
@@ -228,13 +229,13 @@ public class PsiUtil {
     /**
      * Creates a new constructor in the given class with the given parameters and fields and body.
      *
-     * @param psiClass The class for which the constructor should be created.
-     * @param allFields The fields of the class that should be assigned in the constructor.
-     * @param optional The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
-     * @param allParameters The parameters the constructor should have.
-     * @param body The body of the constructor.
+     * @param psiClass         The class for which the constructor should be created.
+     * @param allFields        The fields of the class that should be assigned in the constructor.
+     * @param optional         The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
+     * @param allParameters    The parameters the constructor should have.
+     * @param body             The body of the constructor.
      * @param includeModifiers Whether the modifiers of the fields should be included
-     *                        when the fields are created in the constructor.
+     *                         when the fields are created in the constructor.
      * @return The created constructor.
      */
     public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass,
@@ -292,17 +293,17 @@ public class PsiUtil {
     /**
      * Appends a list of properties to the constructor code.
      *
-     * @param properties The properties to be added to the constructor code.
-     * @param allFields The properties of @param properties that are fields.
-     * @param classfields The fields that already exist in the class.
+     * @param properties         The properties to be added to the constructor code.
+     * @param allFields          The properties of @param properties that are fields.
+     * @param classfields        The fields that already exist in the class.
      * @param toBeAssignedFields The fields that should be assigned in the constructor body.
      *                           This list is updated by this method.
      *                           If a property is already a field in the class, it is added to this list.
-     * @param constructorCode The constructor code to which the properties should be added.
-     *                        This StringBuilder is updated by this method.
-     * @param includeModifiers Whether the modifiers of the fields should be included
-     *                       when the fields are created in the constructor.
-     * @param isOptional Whether the properties are optional.
+     * @param constructorCode    The constructor code to which the properties should be added.
+     *                           This StringBuilder is updated by this method.
+     * @param includeModifiers   Whether the modifiers of the fields should be included
+     *                           when the fields are created in the constructor.
+     * @param isOptional         Whether the properties are optional.
      */
     private static void appendPropertyListToConstructorCode(List<Property> properties,
                                                             List<Property> allFields,
@@ -358,10 +359,10 @@ public class PsiUtil {
     /**
      * Adds the constructor body and field assignments to the constructor code.
      *
-     * @param constructorCode The constructor code to which the body and assignments should be added.
-     *                        This StringBuilder is updated by this method.
-     * @param body The body of the constructor.
-     *             If provided, this body is added to the constructor code.
+     * @param constructorCode    The constructor code to which the body and assignments should be added.
+     *                           This StringBuilder is updated by this method.
+     * @param body               The body of the constructor.
+     *                           If provided, this body is added to the constructor code.
      * @param toBeAssignedFields The fields that should be assigned in the constructor body.
      */
     private static void addConstructorBodyAndAssignments(StringBuilder constructorCode,
@@ -385,7 +386,7 @@ public class PsiUtil {
      * Adds a field to the given class.
      *
      * @param psiClass The class to which the field should be added.
-     * @param field The field to be added.
+     * @param field    The field to be added.
      */
     public static void addFieldToClass(TypeScriptClass psiClass, ES6FieldStatementImpl field) {
 
@@ -397,7 +398,7 @@ public class PsiUtil {
         } else if (psiClass.getFunctions().length > 0) {
             insertBefore = psiClass.getFunctions()[0];
         } else {
-            insertBefore =  psiClass.getLastChild();
+            insertBefore = psiClass.getLastChild();
         }
 
         // Insert the field
@@ -433,7 +434,7 @@ public class PsiUtil {
     /**
      * Adds a parameter to the given parameter list.
      *
-     * @param parameter The parameter to be added.
+     * @param parameter     The parameter to be added.
      * @param parameterList The parameter list to which the parameter should be added.
      */
     public static void addParameterToParameterList(TypeScriptParameter parameter, JSParameterList parameterList) {
@@ -494,6 +495,7 @@ public class PsiUtil {
 
     /**
      * Makes a given class exportable by adding the export keyword in front of it.
+     *
      * @param psiClass The class to be made exportable.
      * @return The class with the export keyword in front of it.
      */
@@ -508,7 +510,7 @@ public class PsiUtil {
         classCode.append("export ");
         classCode.append(psiClass.getText());
 
-        PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText( "PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
+        PsiFile psiFile = PsiFileFactory.getInstance(psiClass.getProject()).createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, classCode);
         TypeScriptClass newClass = PsiTreeUtil.getChildOfType(psiFile, TypeScriptClass.class);
 
         assert newClass != null;
@@ -574,7 +576,7 @@ public class PsiUtil {
         assert attributeList != null;
 
         modifiers.addAll(getModifiers(attributeList));
-        return  modifiers;
+        return modifiers;
     }
 
     /**
@@ -593,11 +595,12 @@ public class PsiUtil {
         assert attributeList != null;
 
         modifiers.addAll(getModifiers(attributeList));
-        return  modifiers;
+        return modifiers;
     }
 
     /**
      * Returns given a parameter all classfields that that parameter is assigned to.
+     *
      * @param parameter The parameter for which the assigned fields should be returned.
      * @return The classfields that the parameter is assigned to.
      */
@@ -677,7 +680,7 @@ public class PsiUtil {
     /**
      * Returns the classfield with the given name in the given class.
      *
-     * @param psiClass The class in which the field should be found.
+     * @param psiClass  The class in which the field should be found.
      * @param fieldName The name of the field to be found.
      * @return The classfield with the given name in the given class. Null if the field is not found.
      */
@@ -692,7 +695,8 @@ public class PsiUtil {
 
     /**
      * Returns the PsiElement (Parameter or Field) from a class that corresponds to the given classfield.
-     * @param psiClass The class in which the property should be found.
+     *
+     * @param psiClass   The class in which the property should be found.
      * @param classfield The classfield to be found.
      * @return The PsiElement that corresponds to the given classfield. Null if the classfield is not found.
      */
@@ -713,16 +717,20 @@ public class PsiUtil {
      * Returns the PsiElement (Parameter or Field) from a class that corresponds to the given name.
      *
      * @param psiClass The class in which the property should be found.
-     * @param name The name of the property to be found.
+     * @param name     The name of the property to be found.
      * @return The PsiElement that corresponds to the given name. Null if the property is not found.
      */
     public static PsiElement getPsiField(JSClass psiClass, String name) {
         for (PsiElement element : getPsiFields(psiClass)) {
-            if (element instanceof TypeScriptField field && Objects.equals(field.getName(), name)) {
-                return field;
+            Classfield classfield = null;
+            if (element instanceof TypeScriptField field) {
+                classfield = new Classfield(field);
+            } else if (element instanceof TypeScriptParameter parameter) {
+                classfield = new Classfield(parameter);
             }
-            if (element instanceof TypeScriptParameter parameter && Objects.equals(parameter.getName(), name)) {
-                return parameter;
+            assert classfield != null;
+            if (classfield.getName().equals(name)) {
+                return element;
             }
         }
 
@@ -733,7 +741,7 @@ public class PsiUtil {
     /**
      * Returns the TypeScriptParameter from a function that corresponds to the given parameter.
      *
-     * @param function The function in which the parameter should be found.
+     * @param function  The function in which the parameter should be found.
      * @param parameter The parameter to be found.
      * @return The TypeScriptParameter that corresponds to the given parameter. Null if the parameter is not found.
      */
@@ -778,7 +786,7 @@ public class PsiUtil {
     /**
      * Returns weather the given class has a setter for the given classfield.
      *
-     * @param psiClass The class in which the setter should be found.
+     * @param psiClass   The class in which the setter should be found.
      * @param classfield The classfield for which the setter should be found.
      */
     public static boolean hasSetter(TypeScriptClass psiClass, Classfield classfield) {
@@ -808,7 +816,7 @@ public class PsiUtil {
     /**
      * Returns weather the given class has a getter for the given classfield.
      *
-     * @param psiClass The class in which the getter should be found.
+     * @param psiClass   The class in which the getter should be found.
      * @param classfield The classfield for which the getter should be found.
      */
     public static boolean hasGetter(TypeScriptClass psiClass, Classfield classfield) {
@@ -839,6 +847,7 @@ public class PsiUtil {
 
     /**
      * Returns weather the given parameter is defining a field.
+     *
      * @param parameter The parameter to be checked.
      * @return True if the parameter is defining a field, false otherwise.
      */
@@ -848,6 +857,7 @@ public class PsiUtil {
 
     /**
      * Returns weather the given parameter is assigned a new value in its function.
+     *
      * @param parameter The parameter to be checked.
      * @return True if the parameter is assigned a new value, false otherwise.
      */
@@ -866,7 +876,8 @@ public class PsiUtil {
 
     /**
      * Returns weather the given class has all the given properties.
-     * @param psiClass The class in which the properties should be found.
+     *
+     * @param psiClass   The class in which the properties should be found.
      * @param properties The properties to be found.
      * @return True if the class has all the given properties, false otherwise.
      */
@@ -876,7 +887,8 @@ public class PsiUtil {
 
         for (Property property : properties) {
             if (!classProperties.contains(property)) return false;
-            if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property)) return false;
+            if (property instanceof Classfield && !classProperties.get(classProperties.indexOf(property)).matches((Classfield) property))
+                return false;
         }
         return true;
     }
@@ -886,7 +898,7 @@ public class PsiUtil {
      *
      * @param reference The reference for which the Classfield should be resolved.
      * @return The Classfield that corresponds to the given reference.
-     *          Null if the reference does not correspond to a Classfield.
+     * Null if the reference does not correspond to a Classfield.
      */
     public static Classfield resolveField(JSReferenceExpression reference) {
 
@@ -906,7 +918,7 @@ public class PsiUtil {
      *
      * @param reference The reference for which the Property should be resolved.
      * @return The Property that corresponds to the given reference.
-     *          Null if the reference does not correspond to a Property.
+     * Null if the reference does not correspond to a Property.
      */
     public static Property resolveProperty(JSReferenceExpression reference) {
         PsiElement definition = reference.resolve();
@@ -930,7 +942,7 @@ public class PsiUtil {
      * Returns the relative path from one file to another. In the way that the path can be used in an import statement.
      *
      * @param from The file from which the path should be calculated.
-     * @param to The file to which the path should be calculated.
+     * @param to   The file to which the path should be calculated.
      * @return The relative path from one file to another.
      */
     public static String getRelativePath(PsiFile from, PsiFile to) {
@@ -944,7 +956,7 @@ public class PsiUtil {
 
         String relativePathString = relativePath.toString();
 
-        return "./" + relativePathString.replace("\\", "/").substring(3, relativePathString.length()-3);
+        return "./" + relativePathString.replace("\\", "/").substring(3, relativePathString.length() - 3);
     }
 
 }

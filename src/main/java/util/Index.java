@@ -1,4 +1,5 @@
 package util;
+
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.*;
@@ -20,7 +21,7 @@ public class Index {
     /**
      * Maps a Property to a List of TypeScriptFunctions that use this Property as a parameter
      */
-    private static HashMap<Property,List<TypeScriptFunction>> propertiesToFunctions;
+    private static HashMap<Property, List<TypeScriptFunction>> propertiesToFunctions;
 
     /**
      * Maps a Property to a List of TypeScriptClasses that use this Property as a field
@@ -42,7 +43,7 @@ public class Index {
      */
     private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
 
-    public static HashMap<Property,List<TypeScriptFunction>> getPropertiesToFunctions() {
+    public static HashMap<Property, List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
     }
 
@@ -158,7 +159,7 @@ public class Index {
             propertiesToFunctions.get(parameter).remove(psiFunction);
         }
 
-        for (Parameter parameter: new_Parameters) {
+        for (Parameter parameter : new_Parameters) {
             addFunctionForParameter(psiFunction, parameter);
         }
     }
@@ -195,7 +196,7 @@ public class Index {
             propertiesToClasses.get(classField).remove(psiClass);
         }
 
-        for (Classfield classField: new_Fields) {
+        for (Classfield classField : new_Fields) {
             addClassForClassfield(psiClass, classField);
         }
     }
@@ -203,7 +204,7 @@ public class Index {
     /**
      * Adds a new Function for a Parameter to the index
      *
-     * @param function The TypeScriptFunction to add
+     * @param function  The TypeScriptFunction to add
      * @param parameter The Parameter to add the function for
      */
     public static void addFunctionForParameter(TypeScriptFunction function, Parameter parameter) {
@@ -221,7 +222,7 @@ public class Index {
     /**
      * Adds a new Class for a ClassField to the index
      *
-     * @param psiClass The TypeScriptClass to add
+     * @param psiClass   The TypeScriptClass to add
      * @param classField The ClassField to add the class for
      */
     public static void addClassForClassfield(TypeScriptClass psiClass, Classfield classField) {
@@ -315,20 +316,21 @@ public class Index {
      */
     public static void printClassFieldsToClasses() {
         ApplicationManager.getApplication().runReadAction(() -> {
-        CodeSmellLogger.info("ClassesFields to Classes: ");
-        for (Property classField : propertiesToClasses.keySet()) {
-            List<TypeScriptClass> classList = propertiesToClasses.get(classField);
-            StringBuilder classes = new StringBuilder("[");
-            for (TypeScriptClass psiClass : classList) {
-                if (psiClass.getName() != null) {
-                    classes.append(psiClass.getName()).append(",");
-                } else {
-                    classes.append("anonymous").append(",");
+            CodeSmellLogger.info("ClassesFields to Classes: ");
+            for (Property classField : propertiesToClasses.keySet()) {
+                List<TypeScriptClass> classList = propertiesToClasses.get(classField);
+                StringBuilder classes = new StringBuilder("[");
+                for (TypeScriptClass psiClass : classList) {
+                    if (psiClass.getName() != null) {
+                        classes.append(psiClass.getName()).append(",");
+                    } else {
+                        classes.append("anonymous").append(",");
+                    }
                 }
+                classes.append("]");
+                CodeSmellLogger.info(classField + " : " + classes);
             }
-            classes.append("]");
-            CodeSmellLogger.info(classField + " : " + classes);
-        }});
+        });
     }
 
     /**
@@ -336,16 +338,16 @@ public class Index {
      */
     public static void printParametersToFunctions() {
         ApplicationManager.getApplication().runReadAction(() -> {
-        CodeSmellLogger.info("Parameters to Functions: ");
-        for (Property parameter : propertiesToFunctions.keySet()) {
-            List<TypeScriptFunction> functions = propertiesToFunctions.get(parameter);
-            StringBuilder parameters = new StringBuilder("[");
-            for (TypeScriptFunction function : functions) {
-                parameters.append(function.getName()).append(",");
+            CodeSmellLogger.info("Parameters to Functions: ");
+            for (Property parameter : propertiesToFunctions.keySet()) {
+                List<TypeScriptFunction> functions = propertiesToFunctions.get(parameter);
+                StringBuilder parameters = new StringBuilder("[");
+                for (TypeScriptFunction function : functions) {
+                    parameters.append(function.getName()).append(",");
+                }
+                parameters.append("]");
+                CodeSmellLogger.info(parameter + " " + parameters);
             }
-            parameters.append("]");
-            CodeSmellLogger.info(parameter + " " + parameters);
-        }
         });
     }
 
@@ -378,7 +380,7 @@ public class Index {
                     classFields.append(classField.toString()).append(",");
                 }
                 classFields.append("]");
-                if (clazz.getName() != null){
+                if (clazz.getName() != null) {
                     CodeSmellLogger.info(clazz.getName() + " " + classFields);
                 } else {
                     CodeSmellLogger.info("anonymous " + classFields);

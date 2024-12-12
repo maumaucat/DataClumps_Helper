@@ -34,7 +34,7 @@ public class CodeSmellLogger {
     /**
      * Logs an error message
      *
-     * @param message The message to log
+     * @param message   The message to log
      * @param throwable The error to throw
      */
     public static void error(String message, Throwable throwable) {

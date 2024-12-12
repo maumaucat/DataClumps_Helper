@@ -1,4 +1,5 @@
 package util;
+
 import Settings.DataClumpSettings;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
@@ -42,7 +43,7 @@ public class Classfield extends Property {
      *
      * @return True if the field is public, false otherwise
      */
-    public boolean isPublic(){
+    public boolean isPublic() {
         return this.modifier.contains("public");
     }
 
@@ -61,7 +62,7 @@ public class Classfield extends Property {
      * @param field The field to compare to
      * @return True if the fields match, false otherwise
      */
-    public boolean matches(Classfield field){
+    public boolean matches(Classfield field) {
         if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection) {
             return this.name.equals(field.name)
                     && this.types.equals(field.types)
