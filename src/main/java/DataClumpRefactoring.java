@@ -226,10 +226,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // if the option to include modifiers in the extracted class is enabled
         // the abstract and declared fields are separated from the constructor fields
-        if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInExtractedClass) {
+        if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInExtractedClass == DataClumpSettings.Modifier.ALL) {
 
-            abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("abstract")).toList();
-            declaredFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifier().contains("declare")).toList();
+            abstractFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifiers().contains("abstract")).toList();
+            declaredFields = fields.stream().filter(property -> property instanceof Classfield && ((Classfield) property).getModifiers().contains("declare")).toList();
 
             constructorFields.removeAll(abstractFields);
             constructorFields.removeAll(declaredFields);
@@ -242,24 +242,24 @@ public class DataClumpRefactoring implements LocalQuickFix {
         TypeScriptClass psiClass = PsiUtil.createClass(dir, className, !abstractFields.isEmpty(), true);
 
         // add a constructor that defines the fields that are not abstract or declared
-        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null, DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
+        TypeScriptFunction constructor = PsiUtil.createConstructor(psiClass, constructorFields, optionalFields, new ArrayList<>(), null, Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInExtractedClass);
         PsiUtil.addFunctionToClass(psiClass, constructor);
 
         // add abstract fields
         for (Property field : abstractFields) {
-            ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getModifier(), false, null);
+            ES6FieldStatementImpl abstractField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getVisibility(), ((Classfield) field).getModifiers(), false, null);
             PsiUtil.addFieldToClass(psiClass, abstractField);
         }
         // add declared fields
         for (Property field : declaredFields) {
-            ES6FieldStatementImpl declaredField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getModifier(), false, null);
+            ES6FieldStatementImpl declaredField = PsiUtil.createJSFieldStatement(psiClass, field.getName(), field.getTypesAsString(), ((Classfield) field).getVisibility(), ((Classfield) field).getModifiers(), false, null);
             PsiUtil.addFieldToClass(psiClass, declaredField);
         }
 
         // Getter and Setter
         for (Property field : fields) {
             // Skip public fields as they do not need getter and setter
-            if (field instanceof Classfield && ((Classfield) field).getModifier().contains("public")) continue;
+            if (DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass != DataClumpSettings.Modifier.NONE && field instanceof Classfield && ((Classfield) field).isPublic()) continue;
 
             TypeScriptFunction getter;
             TypeScriptFunction setter;
@@ -356,8 +356,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
             // get the properties that are not defined in the constructor
             for (Property property : matchingProperties) {
                 // skip abstract fields or declared fields
-                if (property instanceof Classfield && (((Classfield) property).getModifier().contains("abstract") ||
-                        ((Classfield) property).getModifier().contains("declare"))) continue;
+                if (property instanceof Classfield && (((Classfield) property).getModifiers().contains("abstract") ||
+                        ((Classfield) property).getModifiers().contains("declare"))) continue;
 
                 if (!definedClassfields.containsKey(property)) {
                     // if there is another property already with the same name -> it is skipped to not make it even more complex
@@ -702,7 +702,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // add the extracted class as a field
         ES6FieldStatementImpl newFieldStatement = PsiUtil.createJSFieldStatement(
-                psiClass, fieldName, extractedClass.getJSType().getTypeText(), List.of("public"), false, getDefaultInit(psiClass, extractedClass, defaultValues)
+                psiClass, fieldName, extractedClass.getJSType().getTypeText(),"public", new ArrayList<>(), false, getDefaultInit(psiClass, extractedClass, defaultValues)
         );
         PsiUtil.addFieldToClass(psiClass, newFieldStatement);
 

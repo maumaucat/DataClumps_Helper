@@ -1,5 +1,6 @@
 package util;
 
+import Settings.DataClumpSettings;
 import com.intellij.lang.ecmascript6.psi.impl.ES6FieldStatementImpl;
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.*;
@@ -35,9 +36,11 @@ public class PsiUtil {
      * @param optional     Whether the field is optional.
      * @param defaultValue The default value of the field.
      **/
-    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, List<String> modifiers, boolean optional, String defaultValue) {
+    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, String visibility, List<String> modifiers, boolean optional, String defaultValue) {
 
         StringBuilder fieldText = new StringBuilder();
+
+        fieldText.append(visibility).append(" ");
 
         for (String modifier : modifiers) {
             fieldText.append(modifier).append(" ");
@@ -234,16 +237,14 @@ public class PsiUtil {
      * @param optional         The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
      * @param allParameters    The parameters the constructor should have.
      * @param body             The body of the constructor.
-     * @param includeModifiers Whether the modifiers of the fields should be included
-     *                         when the fields are created in the constructor.
-     * @return The created constructor.
+     * @param includedModifiers The modifiers that should be included in the constructor.
      */
     public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass,
                                                        List<Property> allFields,
                                                        Set<Property> optional,
                                                        List<Property> allParameters,
                                                        JSBlockStatement body,
-                                                       boolean includeModifiers) {
+                                                       DataClumpSettings.Modifier includedModifiers) {
 
         // Check if constructor already exists
         if (psiClass.getConstructor() != null) {
@@ -265,8 +266,8 @@ public class PsiUtil {
         StringBuilder constructorCode = new StringBuilder("constructor(");
 
         // Add the properties to the constructor code -> first required, then optional
-        appendPropertyListToConstructorCode(requiredProperties, allFields, classfields, toBeAssignedFields, constructorCode, includeModifiers, false);
-        appendPropertyListToConstructorCode(new ArrayList<>(optional), allFields, classfields, toBeAssignedFields, constructorCode, includeModifiers, true);
+        appendPropertyListToConstructorCode(requiredProperties, allFields, classfields, toBeAssignedFields, constructorCode, includedModifiers, false);
+        appendPropertyListToConstructorCode(new ArrayList<>(optional), allFields, classfields, toBeAssignedFields, constructorCode, includedModifiers, true);
 
         // Clean up and finalize the constructor definition
         if (!allFields.isEmpty() || !allParameters.isEmpty()) { // Check if the constructor has parameters
@@ -301,8 +302,7 @@ public class PsiUtil {
      *                           If a property is already a field in the class, it is added to this list.
      * @param constructorCode    The constructor code to which the properties should be added.
      *                           This StringBuilder is updated by this method.
-     * @param includeModifiers   Whether the modifiers of the fields should be included
-     *                           when the fields are created in the constructor.
+     * @param includedModifiers  The modifiers that should be included in the constructor.
      * @param isOptional         Whether the properties are optional.
      */
     private static void appendPropertyListToConstructorCode(List<Property> properties,
@@ -310,7 +310,7 @@ public class PsiUtil {
                                                             List<Classfield> classfields,
                                                             List<Property> toBeAssignedFields,
                                                             StringBuilder constructorCode,
-                                                            boolean includeModifiers,
+                                                            DataClumpSettings.Modifier includedModifiers,
                                                             boolean isOptional) {
 
         // iterate over all properties and add them to the constructor code
@@ -322,23 +322,28 @@ public class PsiUtil {
             // If the property should be a field in the class and does not yet exist, define it in the constructor
             if (allFields.contains(property) && !classfields.contains(property)) {
 
-                // For new Classfields, use the modifier of the property if includeModifiers is true
-                if (property instanceof Classfield && includeModifiers) {
+                // For new Classfields, use the modifier of the property if includedModifiers is set to ALL or VISIBILITY
+                if (property instanceof Classfield && includedModifiers != DataClumpSettings.Modifier.NONE) {
 
-                    // Add modifiers (if any)
-                    List<String> modifiers = ((Classfield) property).getModifier();
-                    for (String modifier : modifiers) {
-                        if (modifier.equals("abstract")) {
-                            CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
-                        } else if (modifier.equals("declare")) {
-                            CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
-                        } else {
-                            constructorCode.append(modifier).append(" ");
+                    constructorCode.append(((Classfield) property).getVisibility()).append(" ");
+
+                    // Add modifiers if includedModifiers is set to ALL
+                    if (includedModifiers == DataClumpSettings.Modifier.ALL) {
+                        List<String> modifiers = ((Classfield) property).getModifiers();
+                        for (String modifier : modifiers) {
+                            if (modifier.equals("abstract")) {
+                                CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
+                            } else if (modifier.equals("declare")) {
+                                CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
+                            } else {
+                                constructorCode.append(modifier).append(" ");
+                            }
                         }
                     }
 
+
                     // Add the property with its type and visibility
-                    if (!((Classfield) property).getModifier().contains("public")) {
+                    if (!((Classfield) property).getVisibility().equals("public")) {
                         constructorCode.append("_").append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
                     } else {
                         constructorCode.append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
@@ -492,7 +497,7 @@ public class PsiUtil {
 
         WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
             assert statement != null;
-            statement.replace(createJSFieldStatement(field, field.getName(), Objects.requireNonNull(field.getJSType()).getTypeText(), getModifiers(field), true, defaultValue));
+            statement.replace(createJSFieldStatement(field, field.getName(), Objects.requireNonNull(field.getJSType()).getTypeText(), field.getAccessType().toString().toLowerCase(), getModifiers(field), true, defaultValue));
         });
     }
 
@@ -571,39 +576,34 @@ public class PsiUtil {
 
     /**
      * Returns all Modifiers of a field as a list of strings.
+     * The visibility of the field is not included in the modifiers.
      *
      * @param field The field of which the modifiers should be returned.
      * @return The modifiers of the field as a list of strings.
      */
     public static List<String> getModifiers(TypeScriptField field) {
-        List<String> modifiers = new ArrayList<>();
-        modifiers.add(field.getAccessType().toString().toLowerCase());
 
         JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
 
         assert attributeList != null;
 
-        modifiers.addAll(getModifiers(attributeList));
-        return modifiers;
+        return new ArrayList<>(getModifiers(attributeList));
     }
 
     /**
      * Returns all Modifiers of a parameter that is defining a field as a list of strings.
+     * The visibility of the parameter is not included in the modifiers.
      *
      * @param parameter The parameter of which the modifiers should be returned.
      * @return The modifiers of the parameter as a list of strings.
      */
     public static List<String> getModifiers(TypeScriptParameter parameter) {
 
-        List<String> modifiers = new ArrayList<>();
-        modifiers.add(parameter.getAccessType().toString().toLowerCase());
-
         JSAttributeList attributeList = PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class);
 
         assert attributeList != null;
 
-        modifiers.addAll(getModifiers(attributeList));
-        return modifiers;
+        return new ArrayList<>(getModifiers(attributeList));
     }
 
     /**

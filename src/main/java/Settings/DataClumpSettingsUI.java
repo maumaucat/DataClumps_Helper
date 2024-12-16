@@ -18,8 +18,8 @@ public class DataClumpSettingsUI {
 
     private final JPanel mainPanel;
     private final ComboBox<Integer> numberOfProperties;
-    private final JCheckBox includeModifiersInDetection = new JCheckBox("Include Modifiers in Detection");
-    private final JCheckBox includeModifiersInExtractedClass = new JCheckBox("Include Modifiers in Extracted Class");
+    private final ComboBox<DataClumpSettings.Modifier> includeModifiersInDetection = new ComboBox<>(DataClumpSettings.Modifier.values());
+    private final ComboBox<DataClumpSettings.Modifier> includeModifiersInExtractedClass = new ComboBox<>();
     private final JCheckBox includeFieldsInSameHierarchy = new JCheckBox("Include Fields in Same Hierarchy");
 
     /**
@@ -30,20 +30,31 @@ public class DataClumpSettingsUI {
         Integer[] options = {2, 3, 4, 5, 6, 7, 8, 9, 10};
         numberOfProperties = new ComboBox<>(options);
         numberOfProperties.setSelectedItem(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties);
-        includeModifiersInDetection.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInDetection);
-        includeModifiersInExtractedClass.setSelected(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
-        if (!includeModifiersInDetection.isSelected()) {
-            includeModifiersInExtractedClass.setEnabled(false);
+        includeModifiersInDetection.setSelectedItem(DataClumpSettings.getInstance().getState().includeModifiersInDetection);
+        if (includeModifiersInDetection.getSelectedItem() == DataClumpSettings.Modifier.NONE) {
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+        } else if (includeModifiersInDetection.getSelectedItem() == DataClumpSettings.Modifier.VISIBILITY) {
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.VISIBILITY);
+        } else {
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.VISIBILITY);
+            includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.ALL);
         }
+        includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
         includeFieldsInSameHierarchy.setSelected(DataClumpSettings.getInstance().getState().includeFieldsInSameHierarchy);
 
         String TOOLTIP_NUMBER_OF_PROPERTIES = "The minimal number of fields or parameters that should be equal in order to be considered a data clump.";
-        String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "If selected, the modifiers of the fields will be considered when detecting data clumps. " +
-                "In this case the modifier must be equal do two fields can be equal. " +
-                "If deselected, only the names and types of the fields will be considered.";
-        String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "If selected, the modifiers of the fields will be included in the extracted class. " +
-                "If deselected, all fields will be private in the extracted class " +
-                "or if using an existing class, the modifiers will stay as they are in that class.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "Select the modifier types that should be considered when detecting data clumps. " +
+                "In case of ALL the fields must have the same modifiers to be considered equal. " +
+                "In case of VISIBILITY, only the visibility of the fields will be considered. " +
+                "In case of NONE, the modifiers of the fields will not be considered.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "Select the modifier types that should be included in the extracted class. " +
+                "In case the class is newly created. " +
+                "In case of ALL all modifiers will be included in the extracted class. " +
+                "In case of VISIBILITY only the visibility modifiers will be included in the extracted class. " +
+                "In case of NONE no modifiers will be included in the extracted class." +
+                "The selected modifier must be included in the detected data clumps.";
         String TOOLTIP_INCLUDE_FIELDS_IN_SAME_HIERARCHY = "If selected, fields in the same hierarchy will be considered when detecting data clumps. " +
                 "In this case, fields in the same hierarchy can form a data clump. " +
                 "If deselected fields in the same hierarchy can not data clumps.";
@@ -51,22 +62,39 @@ public class DataClumpSettingsUI {
         mainPanel = FormBuilder.createFormBuilder()
                 .addComponent(new JBLabel("Settings for data clump detection: "))
                 .addLabeledComponent(new JBLabel("Number of Fields or Parameters: "), addHelpToolTip(numberOfProperties, TOOLTIP_NUMBER_OF_PROPERTIES), 1, false)
-                .addComponent(addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1)
+                .addLabeledComponent(new JBLabel("Include modifiers in detection: "),addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1)
                 .addComponent(addHelpToolTip(includeFieldsInSameHierarchy, TOOLTIP_INCLUDE_FIELDS_IN_SAME_HIERARCHY), 1)
                 .addComponent(new JBLabel("Settings for extracting class: "))
-                .addComponent(addHelpToolTip(includeModifiersInExtractedClass, TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS), 1)
+                .addLabeledComponent(new JBLabel("Include modifiers in the extracted class: "),addHelpToolTip(includeModifiersInExtractedClass, TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS), 1)
                 .addComponentFillVertically(new JPanel(), 0)
                 .getPanel();
 
 
-        // if include modifiers in detection is deselected, include modifiers in extracted class should also be deselected
+        // only the detected modifier can be selected in the extracted class
         includeModifiersInDetection.addActionListener(e -> {
-            if (!includeModifiersInDetection.isSelected()) {
-                includeModifiersInExtractedClass.setSelected(false);
-                includeModifiersInExtractedClass.setEnabled(false);
+            if (includeModifiersInDetection.getSelectedItem() == DataClumpSettings.Modifier.NONE) {
+                includeModifiersInExtractedClass.removeAllItems();
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+                includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.Modifier.NONE);
+            } else if (includeModifiersInDetection.getSelectedItem() == DataClumpSettings.Modifier.VISIBILITY) {
+                DataClumpSettings.Modifier selected = (DataClumpSettings.Modifier) includeModifiersInExtractedClass.getSelectedItem();
+                includeModifiersInExtractedClass.removeAllItems();
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.VISIBILITY);
+                if (selected == DataClumpSettings.Modifier.ALL) {
+                    includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.Modifier.VISIBILITY);
+                } else {
+                    includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.Modifier.NONE);
+                }
             } else {
-                includeModifiersInExtractedClass.setEnabled(true);
+                DataClumpSettings.Modifier selected = (DataClumpSettings.Modifier) includeModifiersInExtractedClass.getSelectedItem();
+                includeModifiersInExtractedClass.removeAllItems();
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.NONE);
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.VISIBILITY);
+                includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.ALL);
+                includeModifiersInExtractedClass.setSelectedItem(selected);
             }
+
         });
     }
 
@@ -100,20 +128,20 @@ public class DataClumpSettingsUI {
         return (int) numberOfProperties.getSelectedItem();
     }
 
-    public void setIncludeModifiersInDetection(boolean value) {
-        includeModifiersInDetection.setSelected(value);
+    public void setIncludeModifiersInDetection(DataClumpSettings.Modifier value) {
+        includeModifiersInDetection.setSelectedItem(value);
     }
 
-    public boolean getIncludeModifiersInDetection() {
-        return includeModifiersInDetection.isSelected();
+    public DataClumpSettings.Modifier getIncludeModifiersInDetection() {
+        return (DataClumpSettings.Modifier) includeModifiersInDetection.getSelectedItem();
     }
 
-    public void setIncludeModifiersInExtractedClass(boolean value) {
-        includeModifiersInExtractedClass.setSelected(value);
+    public void setIncludeModifiersInExtractedClass(DataClumpSettings.Modifier value) {
+        includeModifiersInExtractedClass.setSelectedItem(value);
     }
 
-    public boolean getIncludeModifiersInExtractedClass() {
-        return includeModifiersInExtractedClass.isSelected();
+    public DataClumpSettings.Modifier getIncludeModifiersInExtractedClass() {
+        return (DataClumpSettings.Modifier) includeModifiersInExtractedClass.getSelectedItem();
     }
 
     public void setIncludeFieldsInSameHierarchy(boolean value) {

@@ -16,6 +16,7 @@ public class Classfield extends Property {
      * The modifiers of the field
      */
     private final List<String> modifier;
+    private final String visibility;
 
     /**
      * Creates a new instance of a class field
@@ -25,6 +26,7 @@ public class Classfield extends Property {
     public Classfield(TypeScriptField field) {
         super(Objects.requireNonNull(field.getName()), field.getJSType());
         this.modifier = PsiUtil.getModifiers(field);
+        this.visibility = field.getAccessType().toString().toLowerCase();
     }
 
     /**
@@ -35,6 +37,7 @@ public class Classfield extends Property {
     public Classfield(TypeScriptParameter parameter) {
         super(Objects.requireNonNull(parameter.getName()), parameter.getJSType());
         this.modifier = PsiUtil.getModifiers(parameter);
+        this.visibility = parameter.getAccessType().toString().toLowerCase();
     }
 
 
@@ -44,10 +47,14 @@ public class Classfield extends Property {
      * @return True if the field is public, false otherwise
      */
     public boolean isPublic() {
-        return this.modifier.contains("public");
+        return this.visibility.equals("public");
     }
 
-    public List<String> getModifier() {
+    public String getVisibility() {
+        return visibility;
+    }
+
+    public List<String> getModifiers() {
         return modifier;
     }
 
@@ -63,10 +70,16 @@ public class Classfield extends Property {
      * @return True if the fields match, false otherwise
      */
     public boolean matches(Classfield field) {
-        if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection) {
+        if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection == DataClumpSettings.Modifier.ALL) {
             return this.name.equals(field.name)
                     && this.types.equals(field.types)
+                    && this.visibility.equals(field.visibility)
                     && this.modifier.equals(field.modifier);
+        } else if (DataClumpSettings.getInstance().getState().includeModifiersInDetection == DataClumpSettings.Modifier.VISIBILITY) {
+            return this.name.equals(field.name)
+                    && this.types.equals(field.types)
+                    && this.visibility.equals(field.visibility);
+
         }
         return this.getName().equals(field.getName())
                 && this.types.equals(field.types);

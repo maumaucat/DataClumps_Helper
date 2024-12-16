@@ -18,6 +18,15 @@ import org.jetbrains.annotations.NotNull;
 public final class DataClumpSettings implements PersistentStateComponent<DataClumpSettings.State> {
 
     /**
+     * Represents the modifier types that can be considered
+     */
+    public enum Modifier {
+        ALL,
+        VISIBILITY,
+        NONE
+    }
+
+    /**
      * The state of the settings
      */
     private State myState = new State();
@@ -28,8 +37,8 @@ public final class DataClumpSettings implements PersistentStateComponent<DataClu
     public static class State {
         @NonNls
         public int minNumberOfProperties = 3;
-        public boolean includeModifiersInDetection = true;
-        public boolean includeModifiersInExtractedClass = true;
+        public Modifier includeModifiersInDetection = Modifier.ALL;
+        public Modifier includeModifiersInExtractedClass = Modifier.ALL; ;
         public boolean includeFieldsInSameHierarchy = true;
     }
 
@@ -53,4 +62,7 @@ public final class DataClumpSettings implements PersistentStateComponent<DataClu
         myState = state;
     }
 
+
 }
+
+
