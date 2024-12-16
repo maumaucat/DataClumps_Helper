@@ -30,7 +30,7 @@ public final class DataClumpSettings implements PersistentStateComponent<DataClu
         public int minNumberOfProperties = 3;
         public boolean includeModifiersInDetection = true;
         public boolean includeModifiersInExtractedClass = true;
-        // Hierachy of classes to be considered for data clump detection
+        public boolean includeFieldsInSameHierarchy = true;
     }
 
     /**

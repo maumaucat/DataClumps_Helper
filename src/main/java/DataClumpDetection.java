@@ -231,8 +231,8 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         if (element1 == element2) return false;
 
-        if (element1 instanceof TypeScriptClass && element2 instanceof TypeScriptClass) {
-            return true;
+        if (element1 instanceof TypeScriptClass class1 && element2 instanceof TypeScriptClass class2) {
+            return checkClasses(class1, class2);
         }
         if (element1 instanceof TypeScriptFunction function1 && element2 instanceof TypeScriptFunction function2) {
             return checkFunctions(function1, function2);
@@ -246,6 +246,14 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         CodeSmellLogger.error("Invalid Elements for Data Clump Detection: " + element1 + " " + element2, new IllegalArgumentException());
         return false;
+    }
+
+    public boolean checkClasses(TypeScriptClass TypeScriptClass1, TypeScriptClass TypeScriptClass2) {
+        if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeFieldsInSameHierarchy) {
+            return true;
+        } else {
+            return !inSameHierarchy(TypeScriptClass1, TypeScriptClass2);
+        }
     }
 
     /**
