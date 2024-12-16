@@ -248,11 +248,18 @@ public class DataClumpDetection extends LocalInspectionTool {
         return false;
     }
 
-    public boolean checkClasses(TypeScriptClass TypeScriptClass1, TypeScriptClass TypeScriptClass2) {
+    /**
+     * Check if the two classes should be compared for data clumps
+     *
+     * @param class1 the first class
+     * @param class2 the second class
+     * @return true if the classes should be compared, false otherwise
+     */
+    public boolean checkClasses(TypeScriptClass class1, TypeScriptClass class2) {
         if (Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeFieldsInSameHierarchy) {
             return true;
         } else {
-            return !inSameHierarchy(TypeScriptClass1, TypeScriptClass2);
+            return !inSameHierarchy(class1, class2);
         }
     }
 
