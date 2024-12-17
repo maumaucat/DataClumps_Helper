@@ -200,7 +200,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         List<Classfield> dataClump = new ArrayList<>();
         for (Property property : selectedProperties) {
-            PsiUtil.getClassfield(extractedClass, property.getName());
+            dataClump.add(PsiUtil.getClassfield(extractedClass, property.getName()));
         }
 
         // refactor the elements that contain the data clump
@@ -735,8 +735,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         List<Classfield> classfields = Index.getClassesToClassFields().get(psiClass);
 
+        CodeSmellLogger.info(dataClump.toString());
         // iterate over all classfields of the class
         for (Classfield classfield : classfields) {
+            CodeSmellLogger.info(classfield.toString());
             // if the classfield is one of the extracted properties -> refactor the references
             if (dataClump.contains(classfield)) {
 
