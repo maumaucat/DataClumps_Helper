@@ -152,12 +152,16 @@ public class DataClumpDetection extends LocalInspectionTool {
         HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
 
         for (Classfield classfield : Index.getClassesToClassFields().get(currentClass)) {
+            if (classfield.isStatic()) continue;
 
             for (TypeScriptClass otherClass : new ArrayList<>(Index.getPropertiesToClasses().get(classfield))) {
-
                 if (!check(currentClass, otherClass)) continue;
+
                 List<Classfield> classfieldList = Index.getClassesToClassFields().get(otherClass);
-                if (classfieldList.contains(classfield) && classfieldList.get(classfieldList.indexOf(classfield)).matches(classfield)) {
+                if (classfieldList.contains(classfield)) {
+                    Classfield otherClassfield = classfieldList.get(classfieldList.indexOf(classfield));
+                    if (!classfield.matches(otherClassfield) || otherClassfield.isStatic()) continue;
+
                     if (!potentialDataClumps.containsKey(otherClass)) {
                         potentialDataClumps.put(otherClass, new ArrayList<>());
                     }
@@ -202,6 +206,8 @@ public class DataClumpDetection extends LocalInspectionTool {
                 if (!check(currentFunction, otherClass)) continue;
 
                 Classfield classfield = Index.getMatchingClassFieldForClass(otherClass, parameter);
+                assert classfield != null;
+                if (classfield.isStatic()) continue;
                 if (!potentialDataClumps.containsKey(otherClass)) {
                     potentialDataClumps.put(otherClass, new ArrayList<>());
                 }

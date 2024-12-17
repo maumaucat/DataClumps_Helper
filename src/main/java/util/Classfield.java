@@ -50,6 +50,15 @@ public class Classfield extends Property {
         return this.visibility.equals("public");
     }
 
+    /**
+     * Checks if the field is static
+     *
+     * @return True if the field is static, false otherwise
+     */
+    public boolean isStatic() {
+        return this.modifier.contains("static");
+    }
+
     public String getVisibility() {
         return visibility;
     }
