@@ -330,17 +330,21 @@ public class PsiUtil {
                     // Add modifiers if includedModifiers is set to ALL
                     if (includedModifiers == DataClumpSettings.Modifier.ALL) {
                         List<String> modifiers = ((Classfield) property).getModifiers();
+                        CodeSmellLogger.info(modifiers.toString());
                         for (String modifier : modifiers) {
-                            if (modifier.equals("abstract")) {
-                                CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
-                            } else if (modifier.equals("declare")) {
-                                CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
-                            } else {
-                                constructorCode.append(modifier).append(" ");
+                            switch (modifier) {
+                                case "readonly" -> {
+                                }
+                                case "abstract" ->
+                                        CodeSmellLogger.error("Abstract modifier is not allowed for class fields", new IllegalArgumentException());
+                                case "declare" ->
+                                        CodeSmellLogger.error("Declare modifier is not allowed for class fields", new IllegalArgumentException());
+                                case "static" ->
+                                        CodeSmellLogger.error("Static modifier is not allowed for class fields", new IllegalArgumentException());
+                                default -> constructorCode.append(modifier).append(" ");
                             }
                         }
                     }
-
 
                     // Add the property with its type and visibility
                     if (!((Classfield) property).getVisibility().equals("public")) {

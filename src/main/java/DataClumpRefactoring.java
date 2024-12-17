@@ -1124,14 +1124,27 @@ public class DataClumpRefactoring implements LocalQuickFix {
         }
 
         // filter classes that have the properties assigned in the constructor
+        // also filter classes where the properties are readonly
         Set<TypeScriptClass> filteredClasses = new HashSet<>(matchingClasses);
 
         for (TypeScriptClass psiClass : matchingClasses) {
             for (Property property : properties) {
-                CodeSmellLogger.info("Trying to get field " + property.getName() + " in class " + psiClass.getQualifiedName());
+
                 PsiElement psiField = PsiUtil.getPsiField(psiClass, property.getName());
                 assert psiField != null;
 
+                // check if the property is readonly -> cannot be refactored
+                if (psiField instanceof TypeScriptField field) {
+                    if (PsiUtil.getModifiers(field).contains("readonly")) {
+                        filteredClasses.remove(psiClass);
+                        break;
+                    }
+                } else if (psiField instanceof TypeScriptParameter parameter) {
+                    if (PsiUtil.getModifiers(parameter).contains("readonly")) {
+                        filteredClasses.remove(psiClass);
+                        break;
+                    }
+                }
                 TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
                 if (constructor == null) break;
 
