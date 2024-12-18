@@ -7,10 +7,15 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>JavaScript</depends>
 
+    <applicationListeners>
+        <listener class="listener.FileChangeListener"
+                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </applicationListeners>
+
     <extensions defaultExtensionNs="com.intellij">
         <localInspection
-                groupName="Code Smells"
-                displayName="Detect Data Clumps"
+                groupName="Code smells"
+                displayName="Detect data clumps"
                 shortName="DataClumpDetection"
                 enabledByDefault="true"
                 implementationClass="DataClumpDetection"

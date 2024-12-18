@@ -18,6 +18,8 @@ import java.util.*;
 
 public class Index {
 
+    private static Project project;
+
     /**
      * Maps a Property to a List of TypeScriptFunctions that use this Property as a parameter
      */
@@ -61,6 +63,10 @@ public class Index {
 
     public static HashMap<TypeScriptFunction, List<Parameter>> getFunctionsToParameters() {
         return functionsToParameters;
+    }
+
+    public static Project getProject() {
+        return project;
     }
 
     /**
@@ -268,6 +274,8 @@ public class Index {
      * @param project The project to reset the index for
      */
     public static void resetIndex(Project project) {
+
+        Index.project = project;
 
         propertiesToFunctions = new HashMap<>();
         propertiesToClasses = new HashMap<>();
