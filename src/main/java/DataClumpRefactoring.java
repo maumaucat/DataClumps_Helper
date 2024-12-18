@@ -13,12 +13,12 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
-import org.apache.commons.compress.harmony.unpack200.bytecode.ClassFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import util.*;
@@ -168,6 +168,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
         } else {
 
             extractedClass = dialog.getSelectedClass();
+            if (hasConflictingSetterOrGetter(extractedClass, selectedProperties)) {
+                Messages.showMessageDialog("The selected class contains a getter or setter with the same name as one of the properties to be extracted. Please select another class.", "Error", Messages.getErrorIcon());
+                applyFix(project, problemDescriptor);
+                return;
+            }
             CodeSmellLogger.info("Using existing class " + extractedClass.getQualifiedName());
 
             // save the original parameters -> needed for refactoring the function calls
@@ -1197,6 +1202,96 @@ public class DataClumpRefactoring implements LocalQuickFix {
         }
 
         return filteredClasses;
+    }
+
+    /**
+     * Checks if the given data clump can be refactored to the given class in terms of getter and setter conflicts.
+     * For each property in the data clump, it is checked if the class already has a getter or setter with the same name.
+     * The user is asked if the getter or setter can be used for the property.
+     * If that's not the case, the class cannot be used for the refactoring.
+     *
+     * @param psiClass the class to check
+     * @param dataClump the data clump to refactor
+     * @return false if the class can be used for the refactoring in terms of getter and setter, true otherwise
+     */
+    private boolean hasConflictingSetterOrGetter(TypeScriptClass psiClass, List<Property> dataClump) {
+        for (Property property : dataClump) {
+            if (hasConflictingSetter(psiClass, property.getName())) return true;
+            if (hasConflictingGetter(psiClass, property.getName())) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the given class has a conflicting setter for the given field.
+     * If a setter for the field already exists, the user is asked if the setter can be used for the field.
+     *
+     * @param psiClass the class to check
+     * @param fieldName the field to check
+     * @return true if the class has a conflicting setter, false otherwise
+     */
+    private boolean hasConflictingSetter(TypeScriptClass psiClass, String fieldName) {
+
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isSetProperty()) continue;
+
+            String setterName = psiFunction.getName();
+
+            if (setterName == null) continue;
+
+            if (setterName.equals(fieldName)) {
+                int response = Messages.showYesNoDialog(
+                        psiFunction.getProject(),
+                        "<html><body>" +
+                                psiFunction.getText() + "<br><br>" +
+                                "</body></html>",
+                        "Can this function be used as a setter for the field </b> \"" + fieldName + "\"?",
+                        Messages.getQuestionIcon()
+                );
+
+                if (response == Messages.NO) {
+                    return true;
+                }
+            }
+        }
+        return false;
+
+    }
+
+    /**
+     * Checks if the given class has a conflicting getter for the given field.
+     * If a getter for the field already exists, the user is asked if the getter can be used for the field.
+     *
+     * @param psiClass the class to check
+     * @param fieldName the field to check
+     * @return true if the class has a conflicting getter, false otherwise
+     */
+    private boolean hasConflictingGetter(TypeScriptClass psiClass, String fieldName) {
+
+        for (JSFunction psiFunction : psiClass.getFunctions()) {
+            if (!psiFunction.isGetProperty()) continue;
+
+            String getterName = psiFunction.getName();
+
+            if (getterName == null) continue;
+
+            if (getterName.equals(fieldName)) {
+                int response = Messages.showYesNoDialog(
+                        psiFunction.getProject(),
+                        "<html><body>" +
+                                psiFunction.getText() + "<br><br>" +
+                                "</body></html>",
+                        "Can this function be used as a getter for the field </b> \"" + fieldName + "\"?",
+                        Messages.getQuestionIcon()
+                );
+
+                if (response == Messages.NO) {
+                    return true;
+                }
+
+            }
+        }
+        return false;
     }
 
     /**

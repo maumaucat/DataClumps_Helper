@@ -11,17 +11,23 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.DialogWrapperDialog;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
-import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.refactoring.rename.RenameProcessor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class PsiUtil {
@@ -803,6 +809,9 @@ public class PsiUtil {
 
     /**
      * Returns weather the given class has a setter for the given classfield.
+     * If the classfield is public, it is considered to have a setter.
+     * Otherwise, checks if there is a set function with the same name as the classfield.
+     * The function does not check if the setter actually sets the field. It only checks if a setter exists.
      *
      * @param psiClass   The class in which the setter should be found.
      * @param classfield The classfield for which the setter should be found.
@@ -818,21 +827,17 @@ public class PsiUtil {
             String fieldName = classfield.getName();
 
             if (setterName == null) continue;
-            boolean nameMatches = setterName.equals(fieldName);
 
-            Parameter setterParameter = new Parameter((TypeScriptParameter) psiFunction.getParameters()[0]);
-            boolean typeMatches = setterParameter.getTypes().equals(classfield.getTypes());
-
-            //TODO make sure that the right value is set
-            //TODO make sure that nothing is modified
-
-            if (nameMatches && typeMatches) return true;
+            if (setterName.equals(fieldName) ) return true;
         }
         return false;
     }
 
     /**
      * Returns weather the given class has a getter for the given classfield.
+     * If the classfield is public, it is considered to have a getter.
+     * Otherwise, checks if there is a get function with the same name as the classfield.
+     * The function does not check if the getter actually gets the field. It only checks if a getter exists.
      *
      * @param psiClass   The class in which the getter should be found.
      * @param classfield The classfield for which the getter should be found.
@@ -847,18 +852,8 @@ public class PsiUtil {
             String getterName = psiFunction.getName();
             String fieldName = classfield.getName();
 
-            // Getter should match field name directly or follow "get" convention
             if (getterName == null) continue;
-            boolean nameMatches = getterName.equals(fieldName);
-
-            // Check if the return type of the getter matches the field type
-            Parameter getterReturn = new Parameter("return", psiFunction.getReturnType());
-            boolean typeMatches = getterReturn.getTypes().equals(classfield.getTypes());
-
-            //TODO make sure that the right value is returned
-            //TODO make sure that nothing is modified
-
-            if (nameMatches && typeMatches) return true;
+            if (getterName.equals(fieldName)) return true;
         }
         return false;
     }
