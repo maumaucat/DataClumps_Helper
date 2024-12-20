@@ -4,6 +4,7 @@ import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.*;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -24,40 +25,36 @@ public class Index {
      * Maps a Property to a List of TypeScriptFunctions that use this Property as a parameter
      */
     private static HashMap<Property, List<TypeScriptFunction>> propertiesToFunctions;
-
     /**
      * Maps a Property to a List of TypeScriptClasses that use this Property as a field
      */
-    private static HashMap<Property, List<TypeScriptClass>> propertiesToClasses;
-
+    private static HashMap<Property, List<JSClass>> propertiesToClasses;
     /**
      * Maps a TypeScriptClass to a List of Classfields that are in this class
      */
-    private static HashMap<TypeScriptClass, List<Classfield>> classesToClassFields;
-
+    private static HashMap<JSClass, List<Classfield>> classesToClassFields;
     /**
      * Maps a TypeScriptFunction to a List of Parameters that are in this function
      */
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
-
     /**
      * Maps a qualified name to a TypeScriptClass
      */
-    private static HashMap<String, TypeScriptClass> qualifiedNamesToClasses;
+    private static HashMap<String, JSClass> qualifiedNamesToClasses;
 
     public static HashMap<Property, List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
     }
 
-    public static HashMap<Property, List<TypeScriptClass>> getPropertiesToClasses() {
+    public static HashMap<Property, List<JSClass>> getPropertiesToClasses() {
         return propertiesToClasses;
     }
 
-    public static HashMap<TypeScriptClass, List<Classfield>> getClassesToClassFields() {
+    public static HashMap<JSClass, List<Classfield>> getClassesToClassFields() {
         return classesToClassFields;
     }
 
-    public static HashMap<String, TypeScriptClass> getQualifiedNamesToClasses() {
+    public static HashMap<String, JSClass> getQualifiedNamesToClasses() {
         return qualifiedNamesToClasses;
     }
 
@@ -93,7 +90,7 @@ public class Index {
      * @param property The Property to get the matching ClassField for
      * @return The matching ClassField
      */
-    public static Classfield getMatchingClassFieldForClass(TypeScriptClass psiClass, Property property) { //TODO duplicate to getField?
+    public static Classfield getMatchingClassFieldForClass(JSClass psiClass, Property property) { //TODO duplicate to getField?
         List<Classfield> classfields = classesToClassFields.get(psiClass);
         for (Classfield classField : classfields) {
             if (classField.equals(property)) return classField;
@@ -107,7 +104,7 @@ public class Index {
      *
      * @param psiClass The TypeScriptClass to add
      */
-    public static void addClass(TypeScriptClass psiClass) {
+    public static void addClass(JSClass psiClass) {
 
         if (psiClass.getQualifiedName() != null) {
             qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
@@ -175,7 +172,7 @@ public class Index {
      *
      * @param psiClass The TypeScriptClass to update
      */
-    public static void updateClass(TypeScriptClass psiClass) {
+    public static void updateClass(JSClass psiClass) {
 
         // wenn die Klasse neu ist -> hinzufügen
         if (!classesToClassFields.containsKey(psiClass)) {
@@ -231,12 +228,12 @@ public class Index {
      * @param psiClass   The TypeScriptClass to add
      * @param classField The ClassField to add the class for
      */
-    public static void addClassForClassfield(TypeScriptClass psiClass, Classfield classField) {
+    public static void addClassForClassfield(JSClass psiClass, Classfield classField) {
         if (propertiesToClasses.containsKey(classField)) {
             if (propertiesToClasses.get(classField).contains(psiClass)) return;
             propertiesToClasses.get(classField).add(psiClass);
         } else {
-            List<TypeScriptClass> classList = new ArrayList<>();
+            List<JSClass> classList = new ArrayList<>();
             classList.add(psiClass);
             propertiesToClasses.put(classField, classList);
         }
@@ -256,7 +253,7 @@ public class Index {
             functionsToParameters.remove(psiFunction);
         }
 
-        if (element instanceof TypeScriptClass psiClass) {
+        if (element instanceof JSClass psiClass) {
 
             for (Classfield classField : classesToClassFields.get(psiClass)) {
                 propertiesToClasses.get(classField).remove(psiClass);
@@ -299,6 +296,7 @@ public class Index {
                     addFunction(psiFunction);
                 }
 
+                // iterate all classes in file
                 Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
                         element instanceof TypeScriptClass
                 ));
@@ -307,6 +305,16 @@ public class Index {
                     TypeScriptClass psiClass = (TypeScriptClass) psiElement;
                     addClass(psiClass);
                 }
+                //iterate all interfaces in file
+                Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                        element instanceof TypeScriptInterface
+                ));
+
+                for (PsiElement psiElement : allInterfaces) {
+                    TypeScriptInterface psiInterface = (TypeScriptInterface) psiElement;
+                    addClass(psiInterface);
+                }
+
             }
         });
 
@@ -326,9 +334,9 @@ public class Index {
         ApplicationManager.getApplication().runReadAction(() -> {
             CodeSmellLogger.info("ClassesFields to Classes: ");
             for (Property classField : propertiesToClasses.keySet()) {
-                List<TypeScriptClass> classList = propertiesToClasses.get(classField);
+                List<JSClass> classList = propertiesToClasses.get(classField);
                 StringBuilder classes = new StringBuilder("[");
-                for (TypeScriptClass psiClass : classList) {
+                for (JSClass psiClass : classList) {
                     if (psiClass.getName() != null) {
                         classes.append(psiClass.getName()).append(",");
                     } else {
@@ -382,14 +390,14 @@ public class Index {
     public static void printClassesToClassFields() {
         ApplicationManager.getApplication().runReadAction(() -> {
             CodeSmellLogger.info("Classes to ClassFields: ");
-            for (TypeScriptClass clazz : classesToClassFields.keySet()) {
+            for (JSClass psiClass : classesToClassFields.keySet()) {
                 StringBuilder classFields = new StringBuilder("[");
-                for (Classfield classField : classesToClassFields.get(clazz)) {
+                for (Classfield classField : classesToClassFields.get(psiClass)) {
                     classFields.append(classField.toString()).append(",");
                 }
                 classFields.append("]");
-                if (clazz.getName() != null) {
-                    CodeSmellLogger.info(clazz.getName() + " " + classFields);
+                if (psiClass.getName() != null) {
+                    CodeSmellLogger.info(psiClass.getName() + " " + classFields);
                 } else {
                     CodeSmellLogger.info("anonymous " + classFields);
                 }

@@ -10,6 +10,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
@@ -104,8 +105,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
             title = "Refactor Data Clump with " + ((TypeScriptFunction) otherElement).getQualifiedName();
         } else {
             assert otherElement != null;
-            CodeSmellLogger.error("Invalid element type for DataClumpRefactoring: " + otherElement.getClass(), new IllegalArgumentException());
-            title = "Error refactor data clump";
+            //CodeSmellLogger.error("Invalid element type for DataClumpRefactoring: " + otherElement.getClass(), new IllegalArgumentException());
+            title = "Error refactor data clump " + PsiUtil.getName(otherElement);
         }
         return title;
     }
@@ -1131,10 +1132,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
         if (!Index.getPropertiesToClasses().containsKey(firstProperty)) return matchingClasses;
 
         // find all classes that contain all properties
-        List<TypeScriptClass> potentialClasses = Index.getPropertiesToClasses().get(firstProperty);
-        for (TypeScriptClass psiClass : potentialClasses) {
-            if (!psiClass.isValid() || psiClass.getName() == null) continue;
-            if (PsiUtil.hasAll(psiClass, properties)) matchingClasses.add(psiClass);
+        List<JSClass> potentialClasses = Index.getPropertiesToClasses().get(firstProperty);
+        for (JSClass psiClass : potentialClasses) {
+            // filter all invalid, anonymous classes and interfaces since they cannot be used for the refactoring
+            if (!psiClass.isValid() || psiClass.getName() == null || !(psiClass instanceof TypeScriptClass)) continue;
+            if (PsiUtil.hasAll((TypeScriptClass) psiClass, properties)) matchingClasses.add((TypeScriptClass) psiClass);
         }
 
         // filter classes that have the properties assigned in the constructor

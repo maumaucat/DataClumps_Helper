@@ -17,6 +17,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nullable;
+import util.CodeSmellLogger;
 import util.Index;
 import util.Property;
 import util.PsiUtil;
@@ -460,7 +461,13 @@ public class DataClumpDialog extends DialogWrapper {
     public TypeScriptClass getSelectedClass() {
         if (this.existingComboBox.getComponents() == null) return null;
         String qualifiedName = (String) this.existingComboBox.getSelectedItem();
-        return Index.getQualifiedNamesToClasses().get(qualifiedName);
+        JSClass jsClass = Index.getQualifiedNamesToClasses().get(qualifiedName);
+        if (jsClass instanceof TypeScriptClass) {
+            return (TypeScriptClass) jsClass;
+        } else {
+            CodeSmellLogger.error("Selected class is not a TypeScriptClass", new ClassCastException());
+            return null;
+        }
     }
 
     /**

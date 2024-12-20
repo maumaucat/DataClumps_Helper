@@ -2,6 +2,7 @@ package listener;
 
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
+import com.intellij.lang.javascript.psi.ecma6.TypeScriptInterface;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
@@ -30,7 +31,7 @@ public class FileChangeListener implements BulkFileListener {
         for (VFileEvent event : events) {
 
             VirtualFile file = event.getFile();
-            if (file != null && file.getName().endsWith(".ts")) {
+            if (file != null && file.isValid() && file.getName().endsWith(".ts")) {
 
                 PsiManager manager = PsiManager.getInstance(Index.getProject());
                 PsiFile psiFile = manager.findFile(file);
@@ -50,6 +51,17 @@ public class FileChangeListener implements BulkFileListener {
                     TypeScriptClass psiClass = (TypeScriptClass) psiElement;
                     Index.updateClass(psiClass);
                 }
+
+                //iterate all interfaces in file -> update index
+                Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                        element instanceof TypeScriptInterface
+                ));
+
+                for (PsiElement psiElement : allInterfaces) {
+                    TypeScriptInterface psiInterface = (TypeScriptInterface) psiElement;
+                    Index.updateClass(psiInterface);
+                }
+
             }
         }
 

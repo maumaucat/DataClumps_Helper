@@ -595,7 +595,9 @@ public class PsiUtil {
 
         JSAttributeList attributeList = PsiTreeUtil.getPrevSiblingOfType(field, JSAttributeList.class);
 
-        assert attributeList != null;
+        if (attributeList == null) {
+            return new ArrayList<>();
+        }
 
         return new ArrayList<>(getModifiers(attributeList));
     }
@@ -646,7 +648,7 @@ public class PsiUtil {
      * @param psiClass The class for which the fields should be returned.
      * @return The fields of the class as a list of Classfields.
      */
-    public static List<Classfield> getClassfields(TypeScriptClass psiClass) {
+    public static List<Classfield> getClassfields(JSClass psiClass) {
 
         List<Classfield> fields = new ArrayList<>();
 
