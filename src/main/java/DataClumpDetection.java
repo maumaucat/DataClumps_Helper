@@ -1,7 +1,5 @@
-import c.o.H.c.T;
 import com.intellij.lang.javascript.psi.ecma6.*;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
-import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.psi.PsiElement;
 import util.*;
 import com.intellij.codeInspection.*;
@@ -12,7 +10,6 @@ import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import Settings.DataClumpSettings;
 
-import java.awt.font.TextAttribute;
 import java.util.*;
 
 /**
@@ -42,7 +39,6 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitJSParameterList(@NotNull JSParameterList parameterList) {
-                CodeSmellLogger.info("Visiting Parameter List: " + parameterList);
 
                 TypeScriptFunction psiFunction = PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class);
                 assert psiFunction != null;
@@ -68,7 +64,6 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
-                CodeSmellLogger.info("Visiting Class: " + TypeScriptClass);
 
                 // Update the index
                 Index.updateClass(TypeScriptClass);
@@ -87,7 +82,6 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitTypeScriptInterface(@NotNull TypeScriptInterface typeScriptInterface) {
-                CodeSmellLogger.info("Visiting Interface: " + typeScriptInterface);
 
                 Index.updateClass(typeScriptInterface);
 
@@ -115,7 +109,6 @@ public class DataClumpDetection extends LocalInspectionTool {
             potentialDataClumps = calculatePotentialDataClumpsForFunction(currentFunction);
         }
 
-        CodeSmellLogger.info("Potential Data Clumps: " + potentialDataClumps);
         processPotentialDataClumps(potentialDataClumps, holder, currentElement);
     }
 
@@ -129,8 +122,6 @@ public class DataClumpDetection extends LocalInspectionTool {
     private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement) {
 
         List<Property> currentElementsProperties = new ArrayList<>();
-        CodeSmellLogger.info("Current Element: " + currentElement);
-        CodeSmellLogger.info("Current Element Valid: " + currentElement.isValid());
 
         if (currentElement instanceof JSClass currentClass) {
             currentElementsProperties = new ArrayList<>(Index.getClassesToClassFields().get(currentClass));
@@ -138,14 +129,8 @@ public class DataClumpDetection extends LocalInspectionTool {
             currentElementsProperties = new ArrayList<>(Index.getFunctionsToParameters().get(currentFunction));
         }
 
-        CodeSmellLogger.info("Current Element Properties: " + currentElementsProperties);
-
         for (PsiElement otherElement : potentialDataClumps.keySet()) {
             List<Property> matchingProperties = potentialDataClumps.get(otherElement);
-            CodeSmellLogger.info("Other Element: " + otherElement);
-            CodeSmellLogger.info(("Other Element Valid: " + otherElement.isValid()));
-            CodeSmellLogger.info("Matching Properties: " + matchingProperties);
-
             // Check if the number of matching properties is greater than the required minimum
             if (matchingProperties.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
 
@@ -161,10 +146,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                             dataClumpElement = PsiUtil.getPsiParameter(currentFunction, property.getName());
                         }
 
-                        CodeSmellLogger.info("Data Clump Element: " + dataClumpElement);
                         assert dataClumpElement != null;
-                        CodeSmellLogger.info("Valid " + dataClumpElement.isValid());
-
 
                         if (!canRefactor(currentElement) || !canRefactor(otherElement)) {
                             holder.registerProblem(dataClumpElement,

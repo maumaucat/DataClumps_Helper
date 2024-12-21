@@ -3,6 +3,7 @@ package listener;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptInterface;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
@@ -33,7 +34,9 @@ public class FileChangeListener implements BulkFileListener {
             VirtualFile file = event.getFile();
             if (file != null && file.isValid() && file.getName().endsWith(".ts")) {
 
-                PsiManager manager = PsiManager.getInstance(Index.getProject());
+                Project project = Index.getProject();
+                if (project == null) continue;
+                PsiManager manager = PsiManager.getInstance(project);
                 PsiFile psiFile = manager.findFile(file);
                 if (psiFile == null || !psiFile.isValid()) continue;
 

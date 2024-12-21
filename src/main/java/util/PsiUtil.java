@@ -39,10 +39,9 @@ public class PsiUtil {
      * @param name         The name of the field.
      * @param type         The type of the field.
      * @param modifiers    The modifiers of the field.
-     * @param optional     Whether the field is optional.
      * @param defaultValue The default value of the field.
      **/
-    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, String visibility, List<String> modifiers, boolean optional, String defaultValue) {
+    public static ES6FieldStatementImpl createJSFieldStatement(PsiElement context, String name, String type, String visibility, List<String> modifiers, String defaultValue) {
 
         StringBuilder fieldText = new StringBuilder();
 
@@ -52,11 +51,8 @@ public class PsiUtil {
             fieldText.append(modifier).append(" ");
         }
 
-        if (optional) {
-            fieldText.append(name).append("?: ").append(type);
-        } else {
-            fieldText.append(name).append(" : ").append(type);
-        }
+        fieldText.append(name).append(" : ").append(type);
+
 
         if (defaultValue != null) {
             fieldText.append(" = ").append(defaultValue);
@@ -139,22 +135,13 @@ public class PsiUtil {
      *
      * @param context  The context in which the getter should be created.
      * @param property The property for which the getter should return the value.
-     * @param optional Whether the property is optional.
      * @return The created getter function.
      */
-    public static TypeScriptFunction createGetter(PsiElement context, Property property, boolean optional) {
+    public static TypeScriptFunction createGetter(PsiElement context, Property property) {
 
-        StringBuilder getterText = new StringBuilder();
-
-        if (optional) {
-            getterText.append("  get ").append(property.getName())
-                    .append("(): ").append(property.getTypesAsString()).append(" | undefined {\n");
-        } else {
-            getterText.append("  get ").append(property.getName())
-                    .append("(): ").append(property.getTypesAsString()).append(" {\n");
-        }
-
-        getterText.append("    return this._").append(property.getName()).append(";\n}");
+        String getterText = "  get " + property.getName() +
+                "(): " + property.getTypesAsString() + " {\n" +
+                "    return this._" + property.getName() + ";\n}";
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
@@ -175,21 +162,13 @@ public class PsiUtil {
      *
      * @param context  The context in which the setter should be created.
      * @param property The property for which the setter should set the value.
-     * @param optional Whether the property is optional.
      * @return The created setter function.
      */
-    public static TypeScriptFunction createSetter(PsiElement context, Property property, boolean optional) {
+    public static TypeScriptFunction createSetter(PsiElement context, Property property){
 
-        StringBuilder setterText = new StringBuilder();
-
-        if (optional) {
-            setterText.append("  set ").append(property.getName())
-                    .append("(value: ").append(property.getTypesAsString()).append(" | undefined) {\n");
-        } else {
-            setterText.append("  set ").append(property.getName())
-                    .append("(value: ").append(property.getTypesAsString()).append(") {\n");
-        }
-        setterText.append("    this._").append(property.getName()).append(" = value;\n}");
+        String setterText = "  set " + property.getName() +
+                "(value: " + property.getTypesAsString() + ") {\n" +
+                "    this._" + property.getName() + " = value;\n}";
 
         StringBuilder classCode = new StringBuilder();
         classCode.append("class PsiUtilTemp {\n");
@@ -240,14 +219,12 @@ public class PsiUtil {
      *
      * @param psiClass         The class for which the constructor should be created.
      * @param allFields        The fields of the class that should be assigned in the constructor.
-     * @param optional         The fields and parameter of the class that are optional. Should be a subset of allFields and allParameters.
      * @param allParameters    The parameters the constructor should have.
      * @param body             The body of the constructor.
      * @param includedModifiers The modifiers that should be included in the constructor.
      */
     public static TypeScriptFunction createConstructor(@NotNull TypeScriptClass psiClass,
                                                        List<Property> allFields,
-                                                       Set<Property> optional,
                                                        List<Property> allParameters,
                                                        JSBlockStatement body,
                                                        DataClumpSettings.Modifier includedModifiers) {
@@ -264,16 +241,11 @@ public class PsiUtil {
         List<Property> allProperties = new ArrayList<>(allFields);
         allProperties.addAll(allParameters);
 
-        // Separate required properties (non-optional) and optional ones
-        List<Property> requiredProperties = new ArrayList<>(allProperties);
-        requiredProperties.removeAll(optional);
-
         // Build the constructor code
         StringBuilder constructorCode = new StringBuilder("constructor(");
 
-        // Add the properties to the constructor code -> first required, then optional
-        appendPropertyListToConstructorCode(requiredProperties, allFields, classfields, toBeAssignedFields, constructorCode, includedModifiers, false);
-        appendPropertyListToConstructorCode(new ArrayList<>(optional), allFields, classfields, toBeAssignedFields, constructorCode, includedModifiers, true);
+        // Add the properties to the constructor code
+        appendPropertyListToConstructorCode(allProperties, allFields, classfields, toBeAssignedFields, constructorCode, includedModifiers);
 
         // Clean up and finalize the constructor definition
         if (!allFields.isEmpty() || !allParameters.isEmpty()) { // Check if the constructor has parameters
@@ -309,15 +281,13 @@ public class PsiUtil {
      * @param constructorCode    The constructor code to which the properties should be added.
      *                           This StringBuilder is updated by this method.
      * @param includedModifiers  The modifiers that should be included in the constructor.
-     * @param isOptional         Whether the properties are optional.
      */
     private static void appendPropertyListToConstructorCode(List<Property> properties,
                                                             List<Property> allFields,
                                                             List<Classfield> classfields,
                                                             List<Property> toBeAssignedFields,
                                                             StringBuilder constructorCode,
-                                                            DataClumpSettings.Modifier includedModifiers,
-                                                            boolean isOptional) {
+                                                            DataClumpSettings.Modifier includedModifiers) {
 
         // iterate over all properties and add them to the constructor code
         for (Property property : properties) {
@@ -336,7 +306,6 @@ public class PsiUtil {
                     // Add modifiers if includedModifiers is set to ALL
                     if (includedModifiers == DataClumpSettings.Modifier.ALL) {
                         List<String> modifiers = ((Classfield) property).getModifiers();
-                        CodeSmellLogger.info(modifiers.toString());
                         for (String modifier : modifiers) {
                             switch (modifier) {
                                 case "readonly" -> {
@@ -354,15 +323,15 @@ public class PsiUtil {
 
                     // Add the property with its type and visibility
                     if (!((Classfield) property).getVisibility().equals("public")) {
-                        constructorCode.append("_").append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                        constructorCode.append("_").append(propertyName).append(": ").append(propertyType).append(", ");
                     } else {
-                        constructorCode.append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                        constructorCode.append(propertyName).append(": ").append(propertyType).append(", ");
                     }
                 } else { // If the property has no modifiers or modifiers should not be included, use the default visibility
-                    constructorCode.append("private _").append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                    constructorCode.append("private _").append(propertyName).append(": ").append(propertyType).append(", ");
                 }
             } else { // If the property already exists in the class or is a parameter, just add it as a parameter
-                constructorCode.append(propertyName).append(isOptional ? "?" : "").append(": ").append(propertyType).append(", ");
+                constructorCode.append(propertyName).append(": ").append(propertyType).append(", ");
                 // If the property is a field in the class, add it to the list of fields to be assigned in the body
                 if (allFields.contains(property)) {
                     toBeAssignedFields.add(property);
@@ -489,29 +458,6 @@ public class PsiUtil {
     }
 
     /**
-     * Makes the given field optional by adding a question mark to its name.
-     *
-     * @param field The field to be made optional.
-     */
-    public static void makeFieldOptional(TypeScriptField field) {
-
-        // Check if the field is already optional
-        if (field.getText().contains("?") || field.getText().contains("undefined")) {
-            return;
-        }
-
-        ES6FieldStatementImpl statement = PsiTreeUtil.getParentOfType(field, ES6FieldStatementImpl.class);
-        JSLiteralExpression initializer = PsiTreeUtil.getChildOfType(statement, JSLiteralExpression.class);
-
-        String defaultValue = initializer != null ? initializer.getText() : null;
-
-        WriteCommandAction.runWriteCommandAction(field.getProject(), () -> {
-            assert statement != null;
-            statement.replace(createJSFieldStatement(field, field.getName(), Objects.requireNonNull(field.getJSType()).getTypeText(), field.getAccessType().toString().toLowerCase(), getModifiers(field), true, defaultValue));
-        });
-    }
-
-    /**
      * Makes a given class exportable by adding the export keyword in front of it.
      *
      * @param psiClass The class to be made exportable.
@@ -629,7 +575,7 @@ public class PsiUtil {
         List<Classfield> fields = new ArrayList<>();
 
         for (PsiReference reference : ReferencesSearch.search(parameter)) {
-            // is the reference an assignment?
+           // is the reference an assignment?
             JSAssignmentExpression assignment = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
 
             if (assignment != null && assignment.getROperand() == reference) {
@@ -924,7 +870,13 @@ public class PsiUtil {
         if (definition instanceof TypeScriptParameter tsParameter && PsiUtil.isParameterField(tsParameter)) {
             return new Classfield(tsParameter);
         }
-
+        // check if the reference is a setter for a property (assuming getters are named the same as the property)
+        if (definition instanceof TypeScriptFunction tsFunction && tsFunction.isSetProperty()) {
+            TypeScriptClass psiClass = PsiTreeUtil.getParentOfType(tsFunction, TypeScriptClass.class);
+            if (psiClass != null) {
+                return getClassfield(psiClass, reference.getReferenceName());
+            }
+        }
         return null;
     }
 
