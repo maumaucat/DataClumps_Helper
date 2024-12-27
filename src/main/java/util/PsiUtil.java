@@ -10,6 +10,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSAttributeList;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
+import com.intellij.lang.javascript.psi.ecmal4.JSSuperExpression;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.DialogWrapperDialog;
@@ -341,6 +342,23 @@ public class PsiUtil {
     }
 
     /**
+     * Returns the super call in the given constructor body.
+     *
+     * @param body The body of the constructor.
+     * @return The super call in the constructor body. Null if no super call is found.
+     */
+    public static JSExpressionStatement getSuperCall(JSBlockStatement body) {
+        if (body != null) {
+            CodeSmellLogger.info(body.getText());
+            JSSuperExpression superKey = PsiTreeUtil.findChildOfType(body, JSSuperExpression.class);
+            if (superKey != null) {
+                return PsiTreeUtil.getParentOfType(superKey, JSExpressionStatement.class);
+            }
+        }
+        return null;
+    }
+
+    /**
      * Adds the constructor body and field assignments to the constructor code.
      *
      * @param constructorCode    The constructor code to which the body and assignments should be added.
@@ -352,6 +370,12 @@ public class PsiUtil {
     private static void addConstructorBodyAndAssignments(StringBuilder constructorCode,
                                                          JSBlockStatement body,
                                                          List<Property> toBeAssignedFields) {
+
+        JSExpressionStatement superCall = getSuperCall(body);
+        if (superCall != null) {
+            constructorCode.append("\n").append(superCall.getText()).append(";");
+            superCall.delete();
+        }
 
         // Add field assignments
         for (Property field : toBeAssignedFields) {

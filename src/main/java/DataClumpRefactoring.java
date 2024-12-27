@@ -652,6 +652,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
      */
     private void updateConstructor(TypeScriptClass psiClass, List<Classfield> dataClump, TypeScriptClass extractedClass, String fieldName, HashMap<Classfield, Parameter> definedClassfields, HashMap<Classfield, String> defaultValues) {
 
+        CodeSmellLogger.info("Updating constructor of " + psiClass.getQualifiedName() + "...");
+
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
         if (constructor == null) return;
 
@@ -672,8 +674,19 @@ public class DataClumpRefactoring implements LocalQuickFix {
         JSStatement initialization = JSPsiElementFactory.createJSStatement(
                 "this." + fieldName + " = " + fieldName + ";", psiClass
         );
+
+        // add the initialization to the constructor block after the super call if it exists
+        JSBlockStatement block = constructor.getBlock();
+        assert block != null;
+        JSExpressionStatement superCall = PsiUtil.getSuperCall(block);
+        PsiElement insertPos;
+        if (superCall != null) {
+           insertPos = superCall;
+        } else {
+            insertPos = block.getFirstChild();
+        }
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
-            Objects.requireNonNull(constructor.getBlock()).addAfter(initialization, constructor.getBlock().getFirstChild());
+            block.addAfter(initialization, insertPos);
         });
 
         // remove all assignments of the form this.person.name = this.person.name
@@ -739,9 +752,13 @@ public class DataClumpRefactoring implements LocalQuickFix {
     }
 
 
-
-
-
+    /**
+     * Refactors all calls of the given constructor to match the new function signature after new arguments where added.
+     *
+     * @param constructor the constructor to refactor
+     * @param originalParameters the original parameters of the constructor before the refactoring
+     * @param defaultValues the default values of the classfields of the class
+     */
     private void refactorConstructorCalls(TypeScriptFunction constructor, List<Property> originalParameters, HashMap<Classfield, String> defaultValues) {
         if (!constructor.isConstructor()) return;
         CodeSmellLogger.info(constructor.getText());
@@ -813,7 +830,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private void refactorFunctionCalls(TypeScriptFunction function,
                                        List<Property> originalParameters,
                                        TypeScriptClass extractedClass,
-                                       @Nullable List<Classfield> dataClump,
+                                       List<Classfield> dataClump,
                                        @Nullable HashMap<Classfield, Parameter> originalDefinedClassfields,
                                        @Nullable HashMap<Classfield, String> defaultValues) {
 
@@ -840,7 +857,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     updatedArguments.append("new ").append(extractedClass.getName()).append("(");
                     for (Property extractedClassProperty : extractedParameters) {
 
-                        if (dataClump != null && !dataClump.contains(extractedClassProperty)) {
+                        if (!dataClump.contains(extractedClassProperty)) {
                             updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty.getTypes())).append(", ");
                             continue;
                         }
@@ -866,7 +883,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
                         } else {
                             // if the function is a constructor -> use the defined classfields and default values
-
                             assert originalDefinedClassfields != null;
                             assert defaultValues != null;
 

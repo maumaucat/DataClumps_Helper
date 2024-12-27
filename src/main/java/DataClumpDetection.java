@@ -148,18 +148,17 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                         assert dataClumpElement != null;
 
-                        if (!canRefactor(currentElement) || !canRefactor(otherElement)) {
+                        if (canRefactor(currentElement) && canRefactor(otherElement)) {
                             holder.registerProblem(dataClumpElement,
                                     "Data Clump with " + PsiUtil.getName(otherElement) +
-                                    ". Matching Properties " + matchingProperties +
-                                    ". This Data Clump can not be automatically refactored since there is an interface involved."
-                                    );
+                                            ". Matching Properties " + matchingProperties + ".",
+                                    new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
                         } else {
                             holder.registerProblem(dataClumpElement,
                                     "Data Clump with " + PsiUtil.getName(otherElement) +
-                                    ". Matching Properties " + matchingProperties + ".",
-                                    new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
-
+                                            ". Matching Properties " + matchingProperties +
+                                            ". This Data Clump can not be automatically refactored."
+                            );
                         }
 
                     }
@@ -169,12 +168,36 @@ public class DataClumpDetection extends LocalInspectionTool {
 
     }
 
+    /**
+     * Check if the element can be refactored automatically. If the element is part of an interface or
+     * if the function is overridden, it can not be refactored.
+     *
+     * @param element the element
+     * @return true if the element can be refactored, false otherwise
+     */
     private boolean canRefactor(PsiElement element) {
-        if (element instanceof TypeScriptFunction) {
+        // if the element is part of an interface, it can not be refactored
+        // functions that are overridden can not be refactored since the overridden functions would be affected
+        if (element instanceof TypeScriptFunction function) {
+            if (isOverritten(function)) return false;
             JSClass containingClass = PsiTreeUtil.getParentOfType(element, JSClass.class);
             return !(containingClass instanceof TypeScriptInterface);
         } else return !(element instanceof TypeScriptInterface);
+    }
 
+    /**
+     * Check if the function is overridden by another function
+     *
+     * @param function the function
+     * @return true if the function is overridden by another function, false otherwise
+     */
+    private boolean isOverritten(TypeScriptFunction function) {
+        List<JSClass> classesWithFunction = Index.getFunctionNamesToClasses().get(function.getName());
+        for (JSClass psiClass : classesWithFunction) {
+            TypeScriptFunction otherFunction = (TypeScriptFunction) psiClass.findFunctionByName(function.getName());
+            if (otherFunction != null && isOverriding(function, otherFunction)) return true;
+        }
+        return false;
     }
 
     /**
@@ -309,6 +332,31 @@ public class DataClumpDetection extends LocalInspectionTool {
         for (JSClass psiClass : resolveHierarchy(containingClass)) {
             if (psiClass == containingClass) continue;
             if (psiClass.findFunctionByName(function.getName()) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if the two functions are overriding each other or the same function in the hierarchy
+     *
+     * @param function1 the first function
+     * @param function2 the second function
+     * @return true if the functions are overriding each other, false otherwise
+     */
+    private boolean isOverriding(TypeScriptFunction function1, TypeScriptFunction function2) {
+
+        if (!Objects.equals(function1.getName(), function2.getName())) return false;
+        JSClass containingClass1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
+        if (containingClass1 == null) return false;
+        JSClass containingClass2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
+        if (containingClass2 == null) return false;
+        if (containingClass1 == containingClass2) return false;
+
+        List<JSClass> commonClasses = getCommonClassesInHierarchy(containingClass1, containingClass2);
+        for (JSClass commonClass : commonClasses) {
+            if (commonClass.findFunctionByName(function1.getName()) != null) {
                 return true;
             }
         }

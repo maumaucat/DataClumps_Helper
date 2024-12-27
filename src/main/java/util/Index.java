@@ -38,9 +38,15 @@ public class Index {
      */
     private static HashMap<TypeScriptFunction, List<Parameter>> functionsToParameters;
     /**
-     * Maps a qualified name to a TypeScriptClass
+     * Maps a qualified name to a class or interface
      */
     private static HashMap<String, JSClass> qualifiedNamesToClasses;
+
+    private static HashMap<String, List<JSClass>> functionNamesToClasses;
+
+    public static HashMap<String, List<JSClass>> getFunctionNamesToClasses() {
+        return functionNamesToClasses;
+    }
 
     public static HashMap<Property, List<TypeScriptFunction>> getPropertiesToFunctions() {
         return propertiesToFunctions;
@@ -128,6 +134,8 @@ public class Index {
 
         if (psiFunction.isConstructor()) return;
 
+        addClassToFunctionName(psiFunction);
+
         functionsToParameters.put(psiFunction, new ArrayList<>());
         List<Parameter> parameters = getParameters(psiFunction);
 
@@ -139,6 +147,25 @@ public class Index {
     }
 
     /**
+     * Adds the containing class to the function name in the index
+     * @param psiFunction The TypeScriptFunction to add the class to
+     */
+    private static void addClassToFunctionName(TypeScriptFunction psiFunction) {
+        if (psiFunction.getName() != null) {
+            JSClass containingClass = PsiTreeUtil.getParentOfType(psiFunction, JSClass.class);
+            if (containingClass != null ) {
+                if (functionNamesToClasses.containsKey(psiFunction.getName())) {
+                    functionNamesToClasses.get(psiFunction.getName()).add(containingClass);
+                } else {
+                    List<JSClass> classes = new ArrayList<>();
+                    classes.add(containingClass);
+                    functionNamesToClasses.put(psiFunction.getName(), classes);
+                }
+            }
+        }
+    }
+
+    /**
      * Updates a TypeScriptFunction in the index
      *
      * @param psiFunction The TypeScriptFunction to update
@@ -146,6 +173,8 @@ public class Index {
     public static void updateFunction(TypeScriptFunction psiFunction) {
 
         if (psiFunction.isConstructor()) return;
+        addClassToFunctionName(psiFunction);
+
 
         if (!functionsToParameters.containsKey(psiFunction)) {
             addFunction(psiFunction);
@@ -251,6 +280,10 @@ public class Index {
                 propertiesToFunctions.get(parameter).remove(psiFunction);
             }
             functionsToParameters.remove(psiFunction);
+            JSClass psiClass = PsiTreeUtil.getParentOfType(psiFunction, JSClass.class);
+            if (psiClass != null) {
+                functionNamesToClasses.get(psiFunction.getName()).remove(psiClass);
+            }
         }
 
         if (element instanceof JSClass psiClass) {
@@ -279,6 +312,7 @@ public class Index {
         classesToClassFields = new HashMap<>();
         functionsToParameters = new HashMap<>();
         qualifiedNamesToClasses = new HashMap<>();
+        functionNamesToClasses = new HashMap<>();
 
         CodeSmellLogger.info("Building index...");
 
