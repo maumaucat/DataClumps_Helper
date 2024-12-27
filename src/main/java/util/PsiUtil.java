@@ -780,6 +780,20 @@ public class PsiUtil {
     }
 
     /**
+     * Returns the qualified name of the given element if it has one or the name otherwise.
+     * The qualified name is the name of the element including the names of its parent elements.
+     *
+     * @param element The element of which the qualified name should be returned.
+     * @return The qualified name of the given element if it has one or the name otherwise.
+     */
+    public static String getQualifiedName(PsiElement element) {
+        if (element instanceof PsiQualifiedNamedElement namedElement) {
+            return namedElement.getQualifiedName();
+        }
+        return getName(element);
+    }
+
+    /**
      * Returns weather the given class has a setter for the given classfield.
      * If the classfield is public, it is considered to have a setter.
      * Otherwise, checks if there is a set function with the same name as the classfield.

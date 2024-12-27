@@ -150,12 +150,12 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                         if (canRefactor(currentElement) && canRefactor(otherElement)) {
                             holder.registerProblem(dataClumpElement,
-                                    "Data Clump with " + PsiUtil.getName(otherElement) +
+                                    "Data Clump with " + PsiUtil.getQualifiedName(otherElement) +
                                             ". Matching Properties " + matchingProperties + ".",
                                     new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
                         } else {
                             holder.registerProblem(dataClumpElement,
-                                    "Data Clump with " + PsiUtil.getName(otherElement) +
+                                    "Data Clump with " + PsiUtil.getQualifiedName(otherElement) +
                                             ". Matching Properties " + matchingProperties +
                                             ". This Data Clump can not be automatically refactored."
                             );
