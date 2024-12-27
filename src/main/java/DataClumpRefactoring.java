@@ -14,6 +14,7 @@ import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
@@ -24,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import util.*;
 
+import javax.swing.*;
 import java.util.*;
 
 
@@ -348,10 +350,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
             // remove the constructor and create a new one with the adjusted parameters
             JSBlockStatement body = constructor.getBlock();
 
-            WriteCommandAction.runWriteCommandAction(psiClass.getProject(), constructor::delete);
-            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, constructorFields, constructorParameter, body, Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection);
-            PsiUtil.addFunctionToClass(psiClass, newConstructor);
 
+            TypeScriptFunction newConstructor = PsiUtil.createConstructor(psiClass, constructorFields, constructorParameter, body, Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection);
+            WriteCommandAction.runWriteCommandAction(psiClass.getProject(), constructor::delete);
+            PsiUtil.addFunctionToClass(psiClass, newConstructor);
         }
     }
 
@@ -493,7 +495,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (defaultValues.containsKey(property)) {
                 init.append(defaultValues.get(property)).append(", ");
             } else {
-                init.append(DefaultValues.getDefaultValue(property.getTypes())).append(", ");
+                init.append(DefaultValues.getDefaultValue(property)).append(", ");
             }
         }
 
@@ -790,7 +792,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     if (definedClassfield != null && defaultValues.get(definedClassfield) != null) {
                         currentValue = defaultValues.get(definedClassfield);
                     } else {
-                        currentValue = DefaultValues.getDefaultValue(currentParameter.getTypes());
+                        currentValue = DefaultValues.getDefaultValue(currentParameter);
                     }
                 }
                 updatedArguments.append(currentValue).append(", ");
@@ -858,7 +860,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     for (Property extractedClassProperty : extractedParameters) {
 
                         if (!dataClump.contains(extractedClassProperty)) {
-                            updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty.getTypes())).append(", ");
+                            updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
                             continue;
                         }
 
@@ -894,7 +896,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                                 } else if (defaultValues.containsKey(extractedClassProperty)) { // if the property has a default value -> use the default value
                                     updatedArguments.append(defaultValues.get(extractedClassProperty)).append(", ");
                                 } else { // if the property is not defined in the constructor and has no default value -> use undefined
-                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty.getTypes())).append(", ");
+                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
                                 }
 
                             } else if (extractedClassProperty instanceof Parameter) {
@@ -906,7 +908,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                                 } else if (defaultValues.containsKey(definedClassfield)) { // if the property has a default value -> use the default value
                                     updatedArguments.append(defaultValues.get(definedClassfield)).append(", ");
                                 } else { // if the property is not defined in the constructor and has no default value -> use undefined
-                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty.getTypes())).append(", ");
+                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
                                 }
                             }
 
@@ -1270,8 +1272,8 @@ public class DataClumpRefactoring implements LocalQuickFix {
          private static final String BOOLEAN = "false";
          private static final String ANY = "undefined";
 
-         public static String getDefaultValue(Set<String> types) {
-             for (String type : types) {
+         public static String getDefaultValue(Property property) {
+             for (String type : property.getTypes()) {
                  switch (type) {
                      case "string":
                          return STRING;
@@ -1281,12 +1283,24 @@ public class DataClumpRefactoring implements LocalQuickFix {
                          return BOOLEAN;
                      case "any":
                          return ANY;
+                     case "undefined":
+                         return UNDEFINED;
                      default:
                          break;
                  }
              }
-             //TODO ASK USER WHAT TO DO
-             return "ERROR";
+
+             String input = null;
+             do {
+                 input = Messages.showInputDialog(
+                         "<html>Please enter a (default) initialization for <b>" + property.getName() +
+                                 " : " + property.getTypesAsString() + "</b>:<br></html>",
+                            "",
+                         Messages.getQuestionIcon()
+                 );
+             } while (input == null || input.isEmpty());
+             return input;
+
          }
     }
 
