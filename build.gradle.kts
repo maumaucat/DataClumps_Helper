@@ -1,6 +1,7 @@
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.aware.SplitModeAware
 
 plugins {
     id("java") // Java support
@@ -31,6 +32,8 @@ repositories {
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
+
+    implementation("com.google.code.gson:gson:2.10.1")
 
     testImplementation(libs.junit)
 
@@ -157,3 +160,67 @@ intellijPlatformTesting {
         }
     }
 }
+
+/*abstract class IOCliTask : org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask() {
+    @get:Input
+    val runner: String? by project
+
+    @get:Input
+    val input: String? by project
+
+    @get:Input
+    val output: String? by project
+
+    init {
+        jvmArgs = listOf(
+            "-Djava.awt.headless=true",
+            "--add-exports",
+            "java.base/jdk.internal.vm=ALL-UNNAMED",
+            "-Djdk.module.illegalAccess.silent=true"
+        )
+        maxHeapSize = "2g"
+        standardInput = System.`in`
+        standardOutput = System.`out`
+        splitMode.set(false)
+        splitModeTarget.set(SplitModeAware.SplitModeTarget.BOTH)
+    }
+}
+
+tasks {
+    register<IOCliTask>("runDemoPluginCLI") {
+
+        dependsOn("buildPlugin")
+        args = listOfNotNull(
+            runner,
+            input?.let { it },
+            output?.let { it }
+        )
+
+        // Setze ein benutzerdefiniertes ApplicationStarter für die Ausführung
+        jvmArgs = listOf(
+            "-Didea.applicationStarter=src/main/java/evoluation/Starter.java",  // Den benutzerdefinierten Starter angeben
+            "-Didea.customArg=customValue"  // Ein benutzerdefiniertes Argument für den Starter angeben
+        )
+    }
+}*/
+
+// only works on 2024.2 not 2024.3 TT
+tasks {
+    register<org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask>("runCliIde") {
+        dependsOn("buildPlugin")
+
+        val projectPath = System.getProperty("projectPath") ?: "defaultValue1"
+        val resultPath  = System.getProperty("resultPath") ?: "defaultValue2"
+
+        println("Project: $projectPath")
+        println("Result: $resultPath")
+
+        jvmArgs = listOf(
+            "-Didea.main.class=evoluation.Starter",
+        )
+        splitMode.set(false)
+        splitModeTarget.set(SplitModeAware.SplitModeTarget.BOTH)
+    }
+}
+
+

@@ -1,6 +1,7 @@
 import com.intellij.lang.javascript.psi.ecma6.*;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.psi.PsiElement;
+import evoluation.DiagnosticTool;
 import util.*;
 import com.intellij.codeInspection.*;
 import com.intellij.lang.javascript.psi.JSElementVisitor;
@@ -101,6 +102,11 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     public void detectDataClump(PsiElement currentElement, ProblemsHolder holder) {
 
+        long start;
+        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+            start = System.nanoTime();
+        }
+
         HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
 
         if (currentElement instanceof JSClass currentClass) {
@@ -109,7 +115,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             potentialDataClumps = calculatePotentialDataClumpsForFunction(currentFunction);
         }
 
-        processPotentialDataClumps(potentialDataClumps, holder, currentElement);
+        processPotentialDataClumps(potentialDataClumps, holder, currentElement, start);
     }
 
     /**
@@ -119,7 +125,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @param holder              the problems holder
      * @param currentElement      the current element
      */
-    private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement) {
+    private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement, long start) {
 
         List<Property> currentElementsProperties = new ArrayList<>();
 
@@ -161,6 +167,12 @@ public class DataClumpDetection extends LocalInspectionTool {
                             );
                         }
 
+                        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                            long end = System.nanoTime();
+                            long time = end - start;
+                            DiagnosticTool.addMeasurement(new DiagnosticTool.Measurement(currentElement, otherElement, matchingProperties, time));
+                        }
+
                     }
                 }
             }
@@ -193,6 +205,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     private boolean isOverritten(TypeScriptFunction function) {
         List<JSClass> classesWithFunction = Index.getFunctionNamesToClasses().get(function.getName());
+        if (classesWithFunction == null) return false;
         for (JSClass psiClass : classesWithFunction) {
             TypeScriptFunction otherFunction = (TypeScriptFunction) psiClass.findFunctionByName(function.getName());
             if (otherFunction != null && isOverriding(function, otherFunction)) return true;

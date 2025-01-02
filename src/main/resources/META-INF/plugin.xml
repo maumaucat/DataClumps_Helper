@@ -8,8 +8,10 @@
     <depends>JavaScript</depends>
 
     <applicationListeners>
-        <listener class="listener.FileChangeListener"
-                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener
+                class="listener.FileChangeListener"
+                topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"
+        />
     </applicationListeners>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -19,17 +21,20 @@
                 shortName="DataClumpDetection"
                 enabledByDefault="true"
                 implementationClass="DataClumpDetection"
-                language="JavaScript"/>
+                language="JavaScript"
+        />
         <postStartupActivity
-                implementation="PostStartupActivity"/>
+                implementation="PostStartupActivity"
+        />
         <applicationService
-                serviceImplementation="Settings.DataClumpSettings"/>
+                serviceImplementation="Settings.DataClumpSettings"
+        />
         <applicationConfigurable
                 parentId="tools"
                 instance="Settings.DataClumpSettingsConfigurable"
                 id="Settings.DataClumpSettingsConfigurable"
-                displayName="Data Clump Helper"/>
-
+                displayName="Data Clump Helper"
+        />
     </extensions>
 
 </idea-plugin>
