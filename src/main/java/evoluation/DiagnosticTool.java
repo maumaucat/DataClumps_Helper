@@ -38,7 +38,7 @@ public class DiagnosticTool {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         List<Measurement> measurements;
 
-        // Datei lesen, wenn sie existiert
+        // read existing measurements
         File file = new File(FILE_PATH);
         if (file.exists()) {
             try (FileReader reader = new FileReader(file)) {
@@ -53,8 +53,10 @@ public class DiagnosticTool {
             measurements = new ArrayList<>();
         }
 
+        // add new measurement
         measurements.add(measurement);
 
+        // write measurements back to file
         try (FileWriter writer = new FileWriter(FILE_PATH)) {
             gson.toJson(measurements, writer);
             CodeSmellLogger.info("Measurement added: " + measurement);

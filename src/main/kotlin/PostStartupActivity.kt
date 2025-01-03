@@ -3,6 +3,7 @@ import util.Index
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.jgoodies.common.base.Objects
+import dataclump.FullAnalysis
 import evoluation.DiagnosticTool
 import util.CodeSmellLogger
 
@@ -22,7 +23,9 @@ class PostStartupActivity : ProjectActivity {
 
             Index.resetIndex(project)
 
-            CodeSmellLogger.info("Plugin 10 loaded")
+            CodeSmellLogger.info("Plugin 11 loaded")
+
+            FullAnalysis.run("C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\fullAnalysis.json")
 
         }
     }

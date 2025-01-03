@@ -19,6 +19,13 @@ import java.util.*;
 
 public class Index {
 
+    /**
+     * Indicates if the index was built and is ready to use
+     */
+    private static boolean indexBuilt = false;
+    /**
+     * The project to build the index for
+     */
     private static Project project;
 
     /**
@@ -43,6 +50,10 @@ public class Index {
     private static HashMap<String, JSClass> qualifiedNamesToClasses;
 
     private static HashMap<String, List<JSClass>> functionNamesToClasses;
+
+    public static boolean isIndexBuilt() {
+        return indexBuilt;
+    }
 
     public static HashMap<String, List<JSClass>> getFunctionNamesToClasses() {
         return functionNamesToClasses;
@@ -305,6 +316,8 @@ public class Index {
      */
     public static void resetIndex(Project project) {
 
+        indexBuilt = false;
+
         Index.project = project;
 
         propertiesToFunctions = new HashMap<>();
@@ -351,6 +364,8 @@ public class Index {
 
             }
         });
+
+        indexBuilt = true;
 
         CodeSmellLogger.info("Index was build.");
 
@@ -438,6 +453,5 @@ public class Index {
             }
         });
     }
-
 }
 

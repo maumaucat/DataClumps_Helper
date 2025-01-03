@@ -1,4 +1,4 @@
-package listener;
+package dataclump.listener;
 
 import com.intellij.psi.PsiElementVisitor;
 import dataclump.DataClumpDetection;
@@ -16,6 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
+import util.DataClumpUtil;
 import util.Index;
 
 import java.util.Collection;
@@ -38,24 +39,17 @@ public class FileChangeListener implements BulkFileListener {
             VirtualFile file = event.getFile();
             if (file != null && file.isValid() && file.getName().endsWith(".ts")) {
 
+                // only proceed if index is built
+                if (!Index.isIndexBuilt()) continue;
+                // get the psi file from the virtual file
                 Project project = Index.getProject();
-                if (project == null) continue;
                 PsiManager manager = PsiManager.getInstance(project);
                 PsiFile psiFile = manager.findFile(file);
                 if (psiFile == null || !psiFile.isValid()) continue;
 
                 // iterate all functions in file -> invoke inspection
-                for (TypeScriptFunction psiFunction : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
-                    ProblemsHolder problemsHolder = new ProblemsHolder(
-                            InspectionManager.getInstance(project),
-                            psiFile,
-                            false
-                    );
-
-                    DataClumpDetection inspection = new DataClumpDetection();
-                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
-
-                    psiFunction.accept(visitor);
+                for (TypeScriptFunction psiElement : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
+                    DataClumpUtil.invokeInspection(psiElement);
                 }
 
                 Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
@@ -64,16 +58,7 @@ public class FileChangeListener implements BulkFileListener {
 
                 // iterate all classes in file -> invoke inspection
                 for (PsiElement psiElement : allClasses) {
-                    ProblemsHolder problemsHolder = new ProblemsHolder(
-                            InspectionManager.getInstance(project),
-                            psiFile,
-                            false
-                    );
-
-                    DataClumpDetection inspection = new DataClumpDetection();
-                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
-
-                    psiElement.accept(visitor);
+                    DataClumpUtil.invokeInspection(psiElement);
                 }
 
                 //iterate all interfaces in file -> invoke inspection
@@ -82,16 +67,7 @@ public class FileChangeListener implements BulkFileListener {
                 ));
 
                 for (PsiElement psiElement : allInterfaces) {
-                    ProblemsHolder problemsHolder = new ProblemsHolder(
-                            InspectionManager.getInstance(project),
-                            psiFile,
-                            false
-                    );
-
-                    DataClumpDetection inspection = new DataClumpDetection();
-                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
-
-                    psiElement.accept(visitor);
+                    DataClumpUtil.invokeInspection(psiElement);
                 }
 
             }

@@ -9,7 +9,7 @@
 
     <applicationListeners>
         <listener
-                class="listener.FileChangeListener"
+                class="dataclump.listener.FileChangeListener"
                 topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"
         />
         <listener

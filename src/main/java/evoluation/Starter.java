@@ -30,7 +30,6 @@ public class Starter implements AppLifecycleListener {
                 DiagnosticTool.init(project);
             }
         }
-
     }
 
 
