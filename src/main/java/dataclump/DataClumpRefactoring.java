@@ -1,3 +1,5 @@
+package dataclump;
+
 import Settings.DataClumpSettings;
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ProblemDescriptor;
@@ -14,7 +16,6 @@ import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
@@ -25,7 +26,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import util.*;
 
-import javax.swing.*;
 import java.util.*;
 
 
@@ -76,7 +76,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
     private final HashMap<Classfield, String> otherDefaultValues = new HashMap<>();
 
     /**
-     * Creates a new DataClumpRefactoring.
+     * Creates a new dataclump.DataClumpRefactoring.
      *
      * @param currentElement     the first element that contains the data clump
      * @param otherElement       the second element that contains the data clump
@@ -107,7 +107,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             title = "Refactor Data Clump with " + ((TypeScriptFunction) otherElement).getQualifiedName();
         } else {
             assert otherElement != null;
-            CodeSmellLogger.error("Invalid element type for DataClumpRefactoring: " + otherElement.getClass(), new IllegalArgumentException());
+            CodeSmellLogger.error("Invalid element type for dataclump.DataClumpRefactoring: " + otherElement.getClass(), new IllegalArgumentException());
             title = "Error refactor data clump " + PsiUtil.getName(otherElement);
         }
         return title;
@@ -1083,7 +1083,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // validate properties
         if (properties.isEmpty())
-            CodeSmellLogger.error("No properties specified for DataClumpRefactoring", new IllegalArgumentException());
+            CodeSmellLogger.error("No properties specified for dataclump.DataClumpRefactoring", new IllegalArgumentException());
 
         Property firstProperty = properties.get(0);
 

@@ -1,3 +1,5 @@
+package dataclump;
+
 import com.intellij.ide.HelpTooltip;
 import com.intellij.lang.ecmascript6.psi.ES6ImportDeclaration;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
@@ -69,7 +71,7 @@ public class DataClumpDialog extends DialogWrapper {
     private JPanel checkBoxPanel;
 
     /**
-     * Creates a new DataClumpDialog.
+     * Creates a new dataclump.DataClumpDialog.
      *
      * @param refactoring the refactoring quickfix
      * @param matching    the list of properties that are part of the data clump

@@ -24,9 +24,9 @@
         <localInspection
                 groupName="Code smells"
                 displayName="Detect data clumps"
-                shortName="DataClumpDetection"
+                shortName="dataclump.DataClumpDetection"
                 enabledByDefault="true"
-                implementationClass="DataClumpDetection"
+                implementationClass="dataclump.DataClumpDetection"
                 language="JavaScript"
         />
         <postStartupActivity

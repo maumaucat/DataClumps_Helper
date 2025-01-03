@@ -1,5 +1,9 @@
 package listener;
 
+import com.intellij.psi.PsiElementVisitor;
+import dataclump.DataClumpDetection;
+import com.intellij.codeInspection.InspectionManager;
+import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptInterface;
@@ -40,34 +44,58 @@ public class FileChangeListener implements BulkFileListener {
                 PsiFile psiFile = manager.findFile(file);
                 if (psiFile == null || !psiFile.isValid()) continue;
 
-                // iterate all functions in file -> update index
+                // iterate all functions in file -> invoke inspection
                 for (TypeScriptFunction psiFunction : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
-                    Index.updateFunction(psiFunction);
+                    ProblemsHolder problemsHolder = new ProblemsHolder(
+                            InspectionManager.getInstance(project),
+                            psiFile,
+                            false
+                    );
+
+                    DataClumpDetection inspection = new DataClumpDetection();
+                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
+
+                    psiFunction.accept(visitor);
                 }
 
                 Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
                         element instanceof TypeScriptClass
                 ));
 
-                // iterate all classes in file -> update index
+                // iterate all classes in file -> invoke inspection
                 for (PsiElement psiElement : allClasses) {
-                    TypeScriptClass psiClass = (TypeScriptClass) psiElement;
-                    Index.updateClass(psiClass);
+                    ProblemsHolder problemsHolder = new ProblemsHolder(
+                            InspectionManager.getInstance(project),
+                            psiFile,
+                            false
+                    );
+
+                    DataClumpDetection inspection = new DataClumpDetection();
+                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
+
+                    psiElement.accept(visitor);
                 }
 
-                //iterate all interfaces in file -> update index
+                //iterate all interfaces in file -> invoke inspection
                 Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
                         element instanceof TypeScriptInterface
                 ));
 
                 for (PsiElement psiElement : allInterfaces) {
-                    TypeScriptInterface psiInterface = (TypeScriptInterface) psiElement;
-                    Index.updateClass(psiInterface);
+                    ProblemsHolder problemsHolder = new ProblemsHolder(
+                            InspectionManager.getInstance(project),
+                            psiFile,
+                            false
+                    );
+
+                    DataClumpDetection inspection = new DataClumpDetection();
+                    PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
+
+                    psiElement.accept(visitor);
                 }
 
             }
         }
-
         BulkFileListener.super.after(events);
     }
 }
