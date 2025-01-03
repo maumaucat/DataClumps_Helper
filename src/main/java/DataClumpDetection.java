@@ -102,7 +102,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     public void detectDataClump(PsiElement currentElement, ProblemsHolder holder) {
 
-        long start;
+        long start = 0;
         if (DiagnosticTool.DIAGNOSTIC_MODE) {
             start = System.nanoTime();
         }

@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.protobuf.DescriptorProtos;
 import com.google.type.DateTime;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import util.CodeSmellLogger;
@@ -24,13 +25,13 @@ import java.util.List;
 
 public class DiagnosticTool {
 
-    public static final boolean DIAGNOSTIC_MODE = true;
-
+    public static boolean DIAGNOSTIC_MODE = false;
     private static String FILE_PATH;
 
-
     public static void init(Project project) {
+        DIAGNOSTIC_MODE = true;
         FILE_PATH = "\\C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\" + "measurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        CodeSmellLogger.info("Diagnostic Tool initialized");
     }
 
     public static void addMeasurement(Measurement measurement) {
