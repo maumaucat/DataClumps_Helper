@@ -43,4 +43,14 @@
         />
     </extensions>
 
+    <actions>
+        <action
+                id="DataClumpFullAnalysis"
+                class="dataclump.FullAnalysis"
+                text="Full data clump analysis"
+                description="Searches the whole project for data clumps">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+
 </idea-plugin>

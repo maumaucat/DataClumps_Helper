@@ -4,9 +4,7 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
-import dataclump.FullAnalysis;
 import util.CodeSmellLogger;
-import util.Parameter;
 import util.Property;
 import util.PsiUtil;
 
@@ -20,16 +18,36 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This class is used to store time measurements of the plugin in a JSON file.
+ */
 public class DiagnosticTool {
 
+    /**
+     * If this flag indicates whether the time measurements are currently being recorded.
+     */
     public static boolean DIAGNOSTIC_MODE = false;
+    /**
+     * The path to the file where the measurements are stored.
+     */
     private static String FILE_PATH;
 
+
+    /**
+     * Initializes the DiagnosticTool with the given project.
+     *
+     * @param project the project to be analyzed
+     */
     public static void init(Project project) {
         DIAGNOSTIC_MODE = true;
         FILE_PATH = "\\C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\" + "measurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
     }
 
+    /**
+     * Adds a new measurement to the file.
+     *
+     * @param newMeasurement the measurement to be added
+     */
     public static void addMeasurement(Measurement newMeasurement) {
         List<Measurement> measurements;
 
@@ -39,14 +57,15 @@ public class DiagnosticTool {
         // if the file exists, read the existing measurements
         if (file.exists()) {
             try (FileReader reader = new FileReader(file)) {
-                Type listType = new TypeToken<List<Measurement>>(){}.getType();
+                Type listType = new TypeToken<List<Measurement>>() {
+                }.getType();
                 measurements = gson.fromJson(reader, listType);
             } catch (IOException e) {
                 CodeSmellLogger.error("Could not read file: " + FILE_PATH, e);
                 return;
             }
         } else {
-           // otherwise, create a new list
+            // otherwise, create a new list
             measurements = new ArrayList<>();
         }
 
@@ -62,13 +81,21 @@ public class DiagnosticTool {
 
     }
 
+    /**
+     * Returns the current date and time in the format "yyyy-MM-dd_HH-mm-ss".
+     * (Can be used in the file name)
+     *
+     * @return the current date and time
+     */
     private static String getCurrentDateTime() {
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
         return now.format(formatter);
     }
 
-
+    /**
+     * Represents a measurement of the plugin.
+     */
     public static abstract class Measurement {
         protected final String name;
         protected final String project;
@@ -83,6 +110,9 @@ public class DiagnosticTool {
         }
     }
 
+    /**
+     * Represents a measurement of the inspection for detection of data clumps.
+     */
     public static class InspectionDetectionMeasurement extends Measurement {
         private final String element1;
         private final String element2;
@@ -106,6 +136,9 @@ public class DiagnosticTool {
         }
     }
 
+    /**
+     * Represents a measurement of the full analysis of the project.
+     */
     public static class FullAnalysisMeasurement extends Measurement {
         private final double durationInMilliSecondsExcludingWriteOperations;
 
@@ -120,7 +153,9 @@ public class DiagnosticTool {
         }
     }
 
-    // Gson Adapter to serialize different Measurement types
+    /**
+     * Custom adapter for the Measurement class to serialize and deserialize it correctly.
+     */
     public static class MeasurementAdapter implements JsonSerializer<Measurement>, JsonDeserializer<Measurement> {
 
         @Override

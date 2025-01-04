@@ -15,8 +15,6 @@ public class Starter implements AppLifecycleListener {
 
     @Override
     public void appStarted() {
-        CodeSmellLogger.info("App started");
-        CodeSmellLogger.info("Headless " + ApplicationManager.getApplication().isHeadlessEnvironment());
 
         if (Objects.equals(System.getProperty("dataclump.diagnostic.tool"),"true")) {
             Project project = openProject();
