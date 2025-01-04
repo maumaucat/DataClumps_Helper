@@ -1,19 +1,13 @@
 package evoluation;
 
 import com.intellij.ide.AppLifecycleListener;
-import com.intellij.ide.GeneralSettings;
-import com.intellij.ide.impl.ProjectUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ex.ProjectManagerEx;
-import com.intellij.openapi.wm.impl.IdeFrameImpl;
-import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame;
-import org.jetbrains.annotations.NotNull;
+import dataclump.FullAnalysis;
 import util.CodeSmellLogger;
+import util.Index;
 
-import javax.swing.*;
-import java.awt.*;
-import java.util.List;
 import java.util.Objects;
 
 public class Starter implements AppLifecycleListener {
@@ -28,10 +22,16 @@ public class Starter implements AppLifecycleListener {
             Project project = openProject();
             if (project != null) {
                 DiagnosticTool.init(project);
+
+                // run full analysis after the index is built
+                Index.addIndexBuildListener(() -> {
+                    String fullAnalysisResultPath = "\\C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\" + "full_analysis_" + project.getName() + ".json";
+                    FullAnalysis.run(fullAnalysisResultPath);
+                });
+
             }
         }
     }
-
 
     public Project openProject() {
 

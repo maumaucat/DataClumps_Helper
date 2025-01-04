@@ -23,6 +23,12 @@ public class Index {
      * Indicates if the index was built and is ready to use
      */
     private static boolean indexBuilt = false;
+
+    /**
+     * List of listeners that are notified when the index is built
+     */
+    private static final List<Runnable> listeners = new ArrayList<>();
+
     /**
      * The project to build the index for
      */
@@ -366,6 +372,7 @@ public class Index {
         });
 
         indexBuilt = true;
+        notifyListeners();
 
         CodeSmellLogger.info("Index was build.");
 
@@ -374,6 +381,22 @@ public class Index {
         printClassesToClassFields();
         printFunctionsToParameter();
 
+    }
+
+
+    public static synchronized void addIndexBuildListener(Runnable listener) {
+        if (indexBuilt) {
+            listener.run();
+        } else {
+            listeners.add(listener);
+        }
+    }
+
+    private static synchronized void notifyListeners() {
+        for (Runnable listener : listeners) {
+            listener.run();
+        }
+        listeners.clear();
     }
 
     /**

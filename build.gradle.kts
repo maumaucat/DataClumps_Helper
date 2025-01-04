@@ -172,21 +172,18 @@ tasks {
 
     register<org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask>("runCliIde") {
         val projectPath = System.getProperty("projectPath") ?: "."
+        
 
         println("Project: $projectPath")
 
         jvmArgs = listOf(
-            "-Djava.awt.headless=true",
+            "-Djava.awt.headless=false",
             "-Ddataclump.diagnostic.tool=true",
-            "-Ddataclump.projectpath=$projectPath"
+            "-Ddataclump.projectpath=$projectPath",
         )
-
-        //args = listOf(projectPath)
 
         splitMode.set(false)
         splitModeTarget.set(SplitModeAware.SplitModeTarget.BOTH)
-
-
     }
 }
 

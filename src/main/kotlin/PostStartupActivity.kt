@@ -23,10 +23,7 @@ class PostStartupActivity : ProjectActivity {
 
             Index.resetIndex(project)
 
-            CodeSmellLogger.info("Plugin 11 loaded")
-
-            FullAnalysis.run("C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\fullAnalysis.json")
-
+            CodeSmellLogger.info("Plugin 13 loaded")
         }
     }
 }
