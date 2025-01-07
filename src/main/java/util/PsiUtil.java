@@ -618,7 +618,7 @@ public class PsiUtil {
 
         // iterate all FieldStatements
         for (JSField field : psiClass.getFields()) {
-            if (field.getName() == null || field.getJSType() == null) continue;
+            if (!(field instanceof TypeScriptField) || field.getName() == null || field.getJSType() == null) continue;
             fields.add(new Classfield((TypeScriptField) field));
         }
 
@@ -626,7 +626,7 @@ public class PsiUtil {
         TypeScriptFunction constructor = (TypeScriptFunction) psiClass.getConstructor();
         if (constructor != null) {
             for (JSParameterListElement psiParameter : constructor.getParameters()) {
-                if (psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
+                if (!(psiParameter instanceof TypeScriptParameter) || psiParameter.getName() == null || psiParameter.getJSType() == null) continue;
                 // test if parameter is actually field
                 if (isParameterField((TypeScriptParameter) psiParameter)) {
                     fields.add(new Classfield((TypeScriptParameter) psiParameter));
@@ -658,7 +658,7 @@ public class PsiUtil {
             for (JSParameterListElement psiParameter : constructor.getParameters()) {
                 // test if parameter is actually field
                 // filter out unfinished fields
-                if (isParameterField((TypeScriptParameter) psiParameter) && psiParameter.getName() != null && psiParameter.getJSType() != null) {
+                if (psiParameter instanceof TypeScriptParameter && isParameterField((TypeScriptParameter) psiParameter) && psiParameter.getName() != null && psiParameter.getJSType() != null) {
                     fields.add(psiParameter);
                 }
             }
@@ -738,6 +738,7 @@ public class PsiUtil {
     public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Parameter parameter) {
 
         for (JSParameterListElement psiParameter : function.getParameters()) {
+            if (!(psiParameter instanceof TypeScriptParameter)) continue;
             if (parameter.equals(new Parameter((TypeScriptParameter) psiParameter))) {
                 return (TypeScriptParameter) psiParameter;
             }
@@ -749,8 +750,18 @@ public class PsiUtil {
 
     public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, String name) {
 
+        // make sure that underscore is not part of the name
+        if (name.startsWith("_")) {
+            name = name.substring(1);
+        }
+
         for (JSParameterListElement psiParameter : function.getParameters()) {
-            if (Objects.equals(psiParameter.getName(), name)) {
+            // make sure that underscore is not part of the name
+            String parameterName = psiParameter.getName();
+            if (parameterName != null && parameterName.startsWith("_")) {
+                parameterName = parameterName.substring(1);
+            }
+            if (Objects.equals(parameterName, name)) {
                 return (TypeScriptParameter) psiParameter;
             }
         }

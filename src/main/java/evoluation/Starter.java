@@ -1,6 +1,7 @@
 package evoluation;
 
 import com.intellij.ide.AppLifecycleListener;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ex.ProjectManagerEx;
@@ -16,9 +17,11 @@ public class Starter implements AppLifecycleListener {
     @Override
     public void appStarted() {
 
-        if (Objects.equals(System.getProperty("dataclump.diagnostic.tool"),"true")) {
+        if (Objects.equals(System.getProperty("dataclump.diagnostic.tool"), "true")) {
             Project project = openProject();
             if (project != null) {
+                Application app = ApplicationManager.getApplication();
+
                 DiagnosticTool.init(project);
 
                 // run full analysis after the index is built
@@ -26,6 +29,7 @@ public class Starter implements AppLifecycleListener {
                     String fullAnalysisResultPath = "\\C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\" + "full_analysis_" + project.getName() + ".json";
                     FullAnalysis.run(fullAnalysisResultPath);
                 });
+
 
             }
         }

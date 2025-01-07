@@ -11,12 +11,12 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptInterface;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -84,69 +84,80 @@ public class FullAnalysis extends AnAction {
      * @param resultPath the path to save the results to
      */
     public static void run(String resultPath) {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
 
-        long startTime = 0;
-        if (DiagnosticTool.DIAGNOSTIC_MODE) {
-            startTime = System.nanoTime();
-        }
-
-        // check if the index is built before running the analysis
-        if (!Index.isIndexBuilt()) {
-            CodeSmellLogger.error("Index not built", new IllegalStateException());
-            return;
-        }
-
-        Project project = Index.getProject();
-        PsiManager manager = PsiManager.getInstance(project);
-
-        List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
-
-        // iterate all TypeScript files in the project
-        for (VirtualFile virtualFile : FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project))) {
-            PsiFile psiFile = manager.findFile(virtualFile);
-
-            // iterate all functions in file
-            for (TypeScriptFunction psiElement : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
-                ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                assert problemsHolder != null;
-                collectProblems(problemsHolder, dataClumpProblems);
+            long startTime = 0;
+            if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                startTime = System.nanoTime();
             }
 
-            // iterate all classes in file
-            Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                    element instanceof TypeScriptClass
-            ));
-
-            for (PsiElement psiElement : allClasses) {
-                ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                assert problemsHolder != null;
-                collectProblems(problemsHolder, dataClumpProblems);
+            // check if the index is built before running the analysis
+            if (!Index.isIndexBuilt()) {
+                CodeSmellLogger.error("Index not built", new IllegalStateException());
+                return;
             }
-            //iterate all interfaces in file
-            Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                    element instanceof TypeScriptInterface
-            ));
 
-            for (PsiElement psiElement : allInterfaces) {
-                ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                assert problemsHolder != null;
-                collectProblems(problemsHolder, dataClumpProblems);
+            CodeSmellLogger.info("Running full analysis");
+
+            Project project = Index.getProject();
+            PsiManager manager = PsiManager.getInstance(project);
+
+            ApplicationManager.getApplication().runReadAction(() -> {
+
+                int numberOfFiles = FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)).size();
+                int numberOfCurrentFile = 1;
+                // iterate all TypeScript files in the project
+                for (VirtualFile virtualFile : FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project))) {
+
+
+                    List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
+
+                    CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + " (" + numberOfCurrentFile + "/" + numberOfFiles + ")");
+                    PsiFile psiFile = manager.findFile(virtualFile);
+
+                    // iterate all functions in file
+                    for (TypeScriptFunction psiElement : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
+                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
+                        assert problemsHolder != null;
+                        collectProblems(problemsHolder, dataClumpProblems);
+                    }
+
+                    // iterate all classes in file
+                    Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                            element instanceof TypeScriptClass
+                    ));
+
+                    for (PsiElement psiElement : allClasses) {
+                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
+                        assert problemsHolder != null;
+                        collectProblems(problemsHolder, dataClumpProblems);
+                    }
+
+                    //iterate all interfaces in file
+                    Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                            element instanceof TypeScriptInterface
+                    ));
+
+                    for (PsiElement psiElement : allInterfaces) {
+                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
+                        assert problemsHolder != null;
+                        collectProblems(problemsHolder, dataClumpProblems);
+                    }
+
+                    // log DataClumpProblems for the file
+                    if (!dataClumpProblems.isEmpty()) {
+                        writeToFile(dataClumpProblems, virtualFile, resultPath);
+                    }
+                    numberOfCurrentFile++;
+                }
+            });
+
+            if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                long endTime = System.nanoTime();
+                long duration = (endTime - startTime) / 1000000;
+                DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisMeasurement(project, duration));
             }
-        }
-
-        long durationWithoutIO = 0;
-        if (DiagnosticTool.DIAGNOSTIC_MODE) {
-            long endTime = System.nanoTime();
-            durationWithoutIO = (endTime - startTime) / 1000000;
-        }
-
-        writeDataClumpsToFile(dataClumpProblems, resultPath);
-
-        if (DiagnosticTool.DIAGNOSTIC_MODE) {
-            long endTime = System.nanoTime();
-            long duration = (endTime - startTime) / 1000000;
-            DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisMeasurement(project, duration, durationWithoutIO));
-        }
+        });
     }
 
     /**
@@ -193,31 +204,17 @@ public class FullAnalysis extends AnAction {
      * @param dataClumpProblems the list of data clump problems to write to the file
      * @param resultPath        the path to save the results to
      */
-    private static void writeDataClumpsToFile(List<DataClumpProblem> dataClumpProblems, String resultPath) {
+    private static void writeToFile(List<DataClumpProblem> dataClumpProblems, VirtualFile file, String resultPath) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        List<DataClumpProblem> problems;
 
-        // read existing measurements
-        File file = new File(resultPath);
-        if (file.exists()) {
-            try (FileReader reader = new FileReader(file)) {
-                Type listType = new TypeToken<List<DataClumpProblem>>() {
-                }.getType();
-                problems = gson.fromJson(reader, listType);
-            } catch (IOException e) {
-                CodeSmellLogger.error("Could not read filepath: " + resultPath, e);
-                return;
+        FilesProblem newProblem = new FilesProblem(file.getName(), dataClumpProblems);
+
+        try (FileWriter writer = new FileWriter(resultPath, true)) {
+            if (new File(resultPath).length() > 0) {
+                writer.write(",");
             }
-        } else {
-            problems = new ArrayList<>();
-        }
+            gson.toJson(newProblem, writer);
 
-        // add new measurement
-        problems.addAll(dataClumpProblems);
-
-        // write measurements back to file
-        try (FileWriter writer = new FileWriter(resultPath)) {
-            gson.toJson(problems, writer);
         } catch (IOException e) {
             CodeSmellLogger.error("Could not write filepath: " + resultPath, e);
         }
@@ -243,6 +240,9 @@ public class FullAnalysis extends AnAction {
                     (element1.equals(other.element2) && element2.equals(other.element1)))
                     && dataClump.equals(other.dataClump);
         }
+    }
+
+    private record FilesProblem(String file, List<DataClumpProblem> dataClumpProblems) {
     }
 
 }

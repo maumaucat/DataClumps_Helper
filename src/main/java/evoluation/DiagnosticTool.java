@@ -140,16 +140,13 @@ public class DiagnosticTool {
      * Represents a measurement of the full analysis of the project.
      */
     public static class FullAnalysisMeasurement extends Measurement {
-        private final double durationInMilliSecondsExcludingWriteOperations;
 
-        public FullAnalysisMeasurement(Project project, long durationNanoSeconds, long durationNanoSecondsExcludingWriteOperations) {
+        public FullAnalysisMeasurement(Project project, long durationNanoSeconds) {
             super("FullAnalysis", project.getName(), getCurrentDateTime(), durationNanoSeconds / 1000000.0);
-            this.durationInMilliSecondsExcludingWriteOperations = durationNanoSeconds / 1000000.0;
         }
 
-        public FullAnalysisMeasurement(String project, String timeOfMeasurement, long durationNanoSeconds, long durationNanoSecondsExcludingWriteOperations) {
+        public FullAnalysisMeasurement(String project, String timeOfMeasurement, long durationNanoSeconds) {
             super("FullAnalysis", project, timeOfMeasurement, durationNanoSeconds / 1000000.0);
-            this.durationInMilliSecondsExcludingWriteOperations = durationNanoSeconds / 1000000.0;
         }
     }
 
@@ -169,8 +166,6 @@ public class DiagnosticTool {
                 jsonObject.addProperty("element1", inspection.element1);
                 jsonObject.addProperty("element2", inspection.element2);
                 jsonObject.add("dataClump", context.serialize(inspection.dataClump));
-            } else if (src instanceof FullAnalysisMeasurement fullAnalysis) {
-                jsonObject.addProperty("durationInMilliSecondsExcludingWriteOperations", fullAnalysis.durationInMilliSecondsExcludingWriteOperations);
             }
 
             return jsonObject;
@@ -178,6 +173,8 @@ public class DiagnosticTool {
 
         @Override
         public Measurement deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            CodeSmellLogger.info("Deserializing measurement: " + json.toString());
+
             JsonObject jsonObject = json.getAsJsonObject();
             String project = jsonObject.get("project").getAsString();
             String timeOfMeasurement = jsonObject.get("timeOfMeasurement").getAsString();
@@ -190,7 +187,7 @@ public class DiagnosticTool {
                 return new InspectionDetectionMeasurement(project, timeOfMeasurement, element1, element2, dataClump, (long) durationInMilliSeconds);
             } else {  // Otherwise, it's a FullAnalysisMeasurement
                 double excludingWriteOps = jsonObject.get("durationInMilliSecondsExcludingWriteOperations").getAsDouble();
-                return new FullAnalysisMeasurement(project, timeOfMeasurement, (long) durationInMilliSeconds, (long) excludingWriteOps);
+                return new FullAnalysisMeasurement(project, timeOfMeasurement, (long) durationInMilliSeconds);
             }
         }
     }

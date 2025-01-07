@@ -41,6 +41,7 @@ public class FileChangeListener implements BulkFileListener {
 
                 // only proceed if index is built
                 if (!Index.isIndexBuilt()) continue;
+
                 // get the psi file from the virtual file
                 Project project = Index.getProject();
                 PsiManager manager = PsiManager.getInstance(project);

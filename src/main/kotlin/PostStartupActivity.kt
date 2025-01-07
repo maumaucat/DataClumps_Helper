@@ -1,11 +1,11 @@
+import com.intellij.openapi.application.Application
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbService
-import util.Index
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
-import com.jgoodies.common.base.Objects
-import dataclump.FullAnalysis
 import evoluation.DiagnosticTool
-import util.CodeSmellLogger
+import groovyjarjarantlr.DiagnosticCodeGenerator
+import util.Index
 
 /**
  * This class is used to execute some code after the project is loaded.
@@ -21,9 +21,8 @@ class PostStartupActivity : ProjectActivity {
         // Ensure that Index.resetIndex is executed after indexing
         dumbService.runWhenSmart {
 
+            val app: Application = ApplicationManager.getApplication()
             Index.resetIndex(project)
-
-            CodeSmellLogger.info("Plugin 13 loaded")
         }
     }
 }
