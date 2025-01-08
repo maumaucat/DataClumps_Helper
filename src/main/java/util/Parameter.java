@@ -16,7 +16,7 @@ public class Parameter extends Property {
      * @param parameter The parameter to create a new instance of
      */
     public Parameter(TypeScriptParameter parameter) {
-        super(Objects.requireNonNull(parameter.getName()), parameter.getJSType());
+        super(Objects.requireNonNull(PsiUtil.runReadActionWithResult(parameter::getName)), PsiUtil.runReadActionWithResult(parameter::getJSType));
     }
 
     /**

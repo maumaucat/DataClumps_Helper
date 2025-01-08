@@ -1,6 +1,7 @@
 package util;
 
 import Settings.DataClumpSettings;
+import com.google.rpc.Code;
 import com.intellij.lang.javascript.TypeScriptFileType;
 import com.intellij.lang.javascript.psi.JSParameterListElement;
 import com.intellij.lang.javascript.psi.ecma6.*;
@@ -55,7 +56,9 @@ public class Index {
      * Maps a qualified name to a class or interface
      */
     private static HashMap<String, JSClass> qualifiedNamesToClasses;
-
+    /**
+     * Maps a function name to a list of classes that contain this function
+     */
     private static HashMap<String, List<JSClass>> functionNamesToClasses;
 
     public static boolean isIndexBuilt() {
@@ -96,15 +99,18 @@ public class Index {
      * @param psiFunction The TypeScriptFunction to get the Parameters from
      * @return A List of Parameters
      */
+    //TODO MOVE TO PSIUTIL
     private static List<Parameter> getParameters(TypeScriptFunction psiFunction) {
         List<Parameter> parameters = new ArrayList<>();
-        for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
-            // invalid / incomplete Parameter
-            if (!(psiParameter instanceof TypeScriptParameter) || psiParameter.getName() == null || psiParameter.getJSType() == null)
-                continue;
-            Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
-            parameters.add(parameter);
-        }
+        ApplicationManager.getApplication().runReadAction(() -> {
+            for (JSParameterListElement psiParameter : psiFunction.getParameters()) {
+                // invalid / incomplete Parameter
+                if (!(psiParameter instanceof TypeScriptParameter) || psiParameter.getName() == null || psiParameter.getJSType() == null)
+                    continue;
+                Parameter parameter = new Parameter((TypeScriptParameter) psiParameter);
+                parameters.add(parameter);
+            }
+        });
         return parameters;
     }
 
@@ -120,7 +126,7 @@ public class Index {
         for (Classfield classField : classfields) {
             if (classField.equals(property)) return classField;
         }
-        CodeSmellLogger.warn("No matching ClassField found for " + property + " in " + psiClass);
+        CodeSmellLogger.warn("No matching ClassField found for " + property + " in " + PsiUtil.getQualifiedName(psiClass));
         return null;
     }
 
@@ -130,16 +136,18 @@ public class Index {
      * @param psiClass The TypeScriptClass to add
      */
     public static void addClass(JSClass psiClass) {
-        
+
         List<Classfield> classfields = PsiUtil.getClassfields(psiClass);
 
         // if the class has less than the minimum number of properties, it does not need to be added to the index (no data clump possible)
         // done to reduce the size of the index and to improve performance
-        if (classfields.size() < Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) return;
+        if (classfields.size() < Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties)
+            return;
 
 
-        if (psiClass.getQualifiedName() != null) {
-            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
+        String qualifiedName = PsiUtil.runReadActionWithResult(psiClass::getQualifiedName);
+        if (qualifiedName != null) {
+            qualifiedNamesToClasses.put(qualifiedName, psiClass);
         }
 
         classesToClassFields.put(psiClass, new ArrayList<>());
@@ -157,14 +165,15 @@ public class Index {
      */
     public static void addFunction(TypeScriptFunction psiFunction) {
 
-        if (psiFunction.isConstructor()) return;
+        if (PsiUtil.runReadActionWithResult(psiFunction::isConstructor)) return;
 
         addClassToFunctionName(psiFunction);
 
         List<Parameter> parameters = getParameters(psiFunction);
         // if the function has less than the minimum number of properties, it does not need to be added to the index (no data clump possible)
         // done to reduce the size of the index and to improve performance
-        if (parameters.size() < Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) return;
+        if (parameters.size() < Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties)
+            return;
         functionsToParameters.put(psiFunction, new ArrayList<>());
 
         // iterate all Parameters in function
@@ -180,8 +189,8 @@ public class Index {
      * @param psiFunction The TypeScriptFunction to add the class to
      */
     private static void addClassToFunctionName(TypeScriptFunction psiFunction) {
-        if (psiFunction.getName() != null) {
-            JSClass containingClass = PsiTreeUtil.getParentOfType(psiFunction, JSClass.class);
+        if (PsiUtil.runReadActionWithResult(psiFunction::getName) != null) {
+            JSClass containingClass = PsiUtil.runReadActionWithResult(()->PsiTreeUtil.getParentOfType(psiFunction, JSClass.class));
             if (containingClass != null) {
                 if (functionNamesToClasses.containsKey(psiFunction.getName())) {
                     functionNamesToClasses.get(psiFunction.getName()).add(containingClass);
@@ -201,7 +210,7 @@ public class Index {
      */
     public static void updateFunction(TypeScriptFunction psiFunction) {
 
-        if (psiFunction.isConstructor()) return;
+        if (PsiUtil.runReadActionWithResult(psiFunction::isConstructor)) return;
         addClassToFunctionName(psiFunction);
 
 
@@ -238,8 +247,9 @@ public class Index {
             return;
         }
 
-        if (psiClass.getQualifiedName() != null) {
-            qualifiedNamesToClasses.put(psiClass.getQualifiedName(), psiClass);
+        String qualifiedName = PsiUtil.runReadActionWithResult(psiClass::getQualifiedName);
+        if (qualifiedName != null) {
+            qualifiedNamesToClasses.put(qualifiedName, psiClass);
         }
 
         // alle aktuellen Klassenfelder der Klasse speichern
@@ -335,7 +345,6 @@ public class Index {
     public static void resetIndex(Project project) {
 
         indexBuilt = false;
-
         Index.project = project;
 
         propertiesToFunctions = new HashMap<>();
@@ -345,41 +354,49 @@ public class Index {
         qualifiedNamesToClasses = new HashMap<>();
         functionNamesToClasses = new HashMap<>();
 
-        CodeSmellLogger.info("Building index...");
-        PsiManager manager = PsiManager.getInstance(project);
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            ApplicationManager.getApplication().runReadAction(() -> {
-                // Alle TypeScriptFiles
-                for (VirtualFile virtualFile : FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project))) {
-                    PsiFile psiFile = manager.findFile(virtualFile);
 
-                    // iterate all functions in file
-                    for (TypeScriptFunction psiFunction : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
-                        addFunction(psiFunction);
-                    }
+            CodeSmellLogger.info("Building index...");
+            PsiManager manager = PsiManager.getInstance(project);
 
-                    // iterate all classes in file
-                    Collection<PsiElement> allClasses = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+            // Alle TypeScriptFiles
+            for (VirtualFile virtualFile : PsiUtil.runReadActionWithResult(() -> FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)))) {
+                PsiFile psiFile = PsiUtil.runReadActionWithResult(() -> manager.findFile(virtualFile));
+
+                Collection<TypeScriptFunction> allFunctions = new ArrayList<>();
+                Collection<PsiElement> allClasses = new ArrayList<>();
+                Collection<PsiElement> allInterfaces = new ArrayList<>();
+
+                // read all functions, classes and interfaces from file
+                ApplicationManager.getApplication().runReadAction(() -> {
+                    allFunctions.addAll(PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class));
+                    allClasses.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
                             element instanceof TypeScriptClass
-                    ));
-
-                    for (PsiElement psiElement : allClasses) {
-                        TypeScriptClass psiClass = (TypeScriptClass) psiElement;
-                        addClass(psiClass);
-                    }
-                    //iterate all interfaces in file
-                    Collection<PsiElement> allInterfaces = List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                    )));
+                    allInterfaces.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
                             element instanceof TypeScriptInterface
-                    ));
+                    )));
+                });
 
-                    for (PsiElement psiElement : allInterfaces) {
-                        TypeScriptInterface psiInterface = (TypeScriptInterface) psiElement;
-                        addClass(psiInterface);
-                    }
 
+                // iterate all functions in file
+                for (TypeScriptFunction psiFunction : allFunctions) {
+                    addFunction(psiFunction);
                 }
-            });
+                //iterate all classes in file
+                for (PsiElement psiElement : allClasses) {
+                    TypeScriptClass psiClass = (TypeScriptClass) psiElement;
+                    addClass(psiClass);
+                }
+                //iterate all interfaces in file
+                for (PsiElement psiElement : allInterfaces) {
+                    TypeScriptInterface psiInterface = (TypeScriptInterface) psiElement;
+                    addClass(psiInterface);
+                }
+
+            }
+
 
             indexBuilt = true;
             notifyListeners();
@@ -407,6 +424,16 @@ public class Index {
             listener.run();
         }
         listeners.clear();
+    }
+
+    public static void printSize() {
+        CodeSmellLogger.info("Index size: " +
+                propertiesToFunctions.size() + " " +
+                propertiesToClasses.size() + " " +
+                classesToClassFields.size() + " " +
+                functionsToParameters.size() + " " +
+                qualifiedNamesToClasses.size() + " " +
+                functionNamesToClasses.size());
     }
 
     /**

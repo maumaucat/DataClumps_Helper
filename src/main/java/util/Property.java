@@ -35,7 +35,7 @@ public abstract class Property {
 
         this.name = name;
         this.types = new HashSet<>();
-        this.types.addAll(Arrays.asList(types.getTypeText().split("\\|")));
+        this.types.addAll(PsiUtil.runReadActionWithResult(() -> Arrays.asList(types.getTypeText().split("\\|"))));
     }
 
     public String getName() {

@@ -24,9 +24,9 @@ public class Classfield extends Property {
      * @param field The field to create a new instance of
      */
     public Classfield(TypeScriptField field) {
-        super(Objects.requireNonNull(field.getName()), field.getJSType());
+        super(Objects.requireNonNull(PsiUtil.runReadActionWithResult(field::getName)), PsiUtil.runReadActionWithResult(field::getJSType));
         this.modifier = PsiUtil.getModifiers(field);
-        this.visibility = field.getAccessType().toString().toLowerCase();
+        this.visibility = PsiUtil.runReadActionWithResult(()->field.getAccessType().toString().toLowerCase());
     }
 
     /**
@@ -35,9 +35,9 @@ public class Classfield extends Property {
      * @param parameter The parameter to create a new instance of
      */
     public Classfield(TypeScriptParameter parameter) {
-        super(Objects.requireNonNull(parameter.getName()), parameter.getJSType());
+        super(Objects.requireNonNull(PsiUtil.runReadActionWithResult(parameter::getName)), PsiUtil.runReadActionWithResult(parameter::getJSType));
         this.modifier = PsiUtil.getModifiers(parameter);
-        this.visibility = parameter.getAccessType().toString().toLowerCase();
+        this.visibility = PsiUtil.runReadActionWithResult(()->parameter.getAccessType().toString().toLowerCase());
     }
 
 

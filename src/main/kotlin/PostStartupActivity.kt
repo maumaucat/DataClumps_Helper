@@ -20,8 +20,6 @@ class PostStartupActivity : ProjectActivity {
 
         // Ensure that Index.resetIndex is executed after indexing
         dumbService.runWhenSmart {
-
-            val app: Application = ApplicationManager.getApplication()
             Index.resetIndex(project)
         }
     }

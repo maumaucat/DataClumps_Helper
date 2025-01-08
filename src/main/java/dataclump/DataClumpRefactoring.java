@@ -14,6 +14,7 @@ import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.lang.javascript.psi.impl.JSPsiElementFactory;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -39,15 +40,15 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * List of properties that are always used together
      */
-    private final List<Property> matchingProperties;
+    private List<Property> matchingProperties;
     /**
      * The first element that contains the data clump
      */
-    private final SmartPsiElementPointer<PsiElement> currentElement;
+    private SmartPsiElementPointer<PsiElement> currentElement;
     /**
      * The second element that contains the data clump
      */
-    private final SmartPsiElementPointer<PsiElement> otherElement;
+    private SmartPsiElementPointer<PsiElement> otherElement;
 
     /**
      * Maps the classfields to the parameters that define them in the constructor for the first element
@@ -83,10 +84,12 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * @param matchingProperties the properties that are always used together
      */
     public DataClumpRefactoring(@NotNull PsiElement currentElement, @NotNull PsiElement otherElement, @NotNull List<Property> matchingProperties) {
-        SmartPointerManager psiPointerManager = SmartPointerManager.getInstance(currentElement.getProject());
-        this.matchingProperties = matchingProperties;
-        this.currentElement = psiPointerManager.createSmartPsiElementPointer(currentElement);
-        this.otherElement = psiPointerManager.createSmartPsiElementPointer(otherElement);
+        ApplicationManager.getApplication().runReadAction(() -> {
+            SmartPointerManager psiPointerManager = SmartPointerManager.getInstance(currentElement.getProject());
+            this.matchingProperties = matchingProperties;
+            this.currentElement = psiPointerManager.createSmartPsiElementPointer(currentElement);
+            this.otherElement = psiPointerManager.createSmartPsiElementPointer(otherElement);
+        });
     }
 
     /**
@@ -125,93 +128,101 @@ public class DataClumpRefactoring implements LocalQuickFix {
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
 
-        // show dialog to select properties
-        DataClumpDialog dialog = new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement.getElement()), Objects.requireNonNull(otherElement.getElement()));
+        // make sure that the refactoring is executed in the event dispatch thread to avoid issues with the UI and PSI
+        ApplicationManager.getApplication().invokeLater(() -> {
+            // show dialog to select properties
+            DataClumpDialog dialog = new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement.getElement()), Objects.requireNonNull(otherElement.getElement()));
 
-        if (!dialog.showAndGet()) return;
+            if (!dialog.showAndGet()) return;
 
-        CodeSmellLogger.info("Refactoring DataClump between " + currentElement + " and " + otherElement);
+            // execute the refactoring in a write action to modify the PSI
+            WriteCommandAction.runWriteCommandAction(project, () -> {
 
-        List<Property> selectedProperties = dialog.getProperties();
+                CodeSmellLogger.info("Refactoring DataClump between " + currentElement + " and " + otherElement);
 
-        PsiElement currentElement = this.currentElement.getElement();
-        PsiElement otherElement = this.otherElement.getElement();
+                List<Property> selectedProperties = dialog.getProperties();
 
-        TypeScriptClass extractedClass;
+                PsiElement currentElement = this.currentElement.getElement();
+                PsiElement otherElement = this.otherElement.getElement();
 
-        // in case that the to be refactored element is a class,
-        // the information about the constructor and the default values of the classfields are extracted
-        if (currentElement instanceof TypeScriptClass) {
-            TypeScriptFunction constructor = (TypeScriptFunction) ((TypeScriptClass) currentElement).getConstructor();
-            if (constructor != null) {
-                getClassfieldDefiningParameter(constructor, currentDefiningParameters, currentDefinedClassFields);
-            }
-            getDefaultValues((TypeScriptClass) currentElement, selectedProperties, currentDefaultValues);
-        }
-        if (otherElement instanceof TypeScriptClass) {
-            TypeScriptFunction constructor = (TypeScriptFunction) ((TypeScriptClass) otherElement).getConstructor();
-            if (constructor != null) {
-                getClassfieldDefiningParameter(constructor, otherDefiningParameters, otherDefinedClassFields);
-            }
-            getDefaultValues((TypeScriptClass) otherElement, selectedProperties, otherDefaultValues);
-        }
+                TypeScriptClass extractedClass;
 
-        // create or use existing class
-        if (dialog.shouldCreateNewClass()) {
-            String className = dialog.getClassName();
-            PsiDirectory targetDirectory = dialog.getDirectory();
-            CodeSmellLogger.info("Creating new class with name " + className + " in " + targetDirectory);
-            extractedClass = extractClass(targetDirectory, className, selectedProperties);
-            Index.addClass(extractedClass);
-        } else {
+                // in case that the to be refactored element is a class,
+                // the information about the constructor and the default values of the classfields are extracted
+                if (currentElement instanceof TypeScriptClass) {
+                    TypeScriptFunction constructor = (TypeScriptFunction) ((TypeScriptClass) currentElement).getConstructor();
+                    if (constructor != null) {
+                        getClassfieldDefiningParameter(constructor, currentDefiningParameters, currentDefinedClassFields);
+                    }
+                    getDefaultValues((TypeScriptClass) currentElement, selectedProperties, currentDefaultValues);
+                }
+                if (otherElement instanceof TypeScriptClass) {
+                    TypeScriptFunction constructor = (TypeScriptFunction) ((TypeScriptClass) otherElement).getConstructor();
+                    if (constructor != null) {
+                        getClassfieldDefiningParameter(constructor, otherDefiningParameters, otherDefinedClassFields);
+                    }
+                    getDefaultValues((TypeScriptClass) otherElement, selectedProperties, otherDefaultValues);
+                }
 
-            extractedClass = dialog.getSelectedClass();
-            if (hasConflictingSetterOrGetter(extractedClass, selectedProperties)) {
-                Messages.showMessageDialog("The selected class contains a getter or setter with the same name as one of the properties to be extracted. Please select another class.", "Error", Messages.getErrorIcon());
-                applyFix(project, problemDescriptor);
-                return;
-            }
-            CodeSmellLogger.info("Using existing class " + extractedClass.getQualifiedName());
+                // create or use existing class
+                if (dialog.shouldCreateNewClass()) {
+                    String className = dialog.getClassName();
+                    PsiDirectory targetDirectory = dialog.getDirectory();
+                    CodeSmellLogger.info("Creating new class with name " + className + " in " + targetDirectory);
+                    extractedClass = extractClass(targetDirectory, className, selectedProperties);
+                    Index.addClass(extractedClass);
+                } else {
 
-            // save the original parameters -> needed for refactoring the function calls
-            List<Property> originalParameters = new ArrayList<>();
-            if (extractedClass.getConstructor() != null) {
-                originalParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
-            }
+                    extractedClass = dialog.getSelectedClass();
+                    if (hasConflictingSetterOrGetter(extractedClass, selectedProperties)) {
+                        Messages.showMessageDialog("The selected class contains a getter or setter with the same name as one of the properties to be extracted. Please select another class.", "Error", Messages.getErrorIcon());
+                        applyFix(project, problemDescriptor);
+                        return;
+                    }
+                    CodeSmellLogger.info("Using existing class " + extractedClass.getQualifiedName());
 
-            extractedClass = PsiUtil.makeClassExported(extractedClass);
-            assert extractedClass != null;
-            Index.updateClass(extractedClass); // since the class was replaced the index must be updated
+                    // save the original parameters -> needed for refactoring the function calls
+                    List<Property> originalParameters = new ArrayList<>();
+                    if (extractedClass.getConstructor() != null) {
+                        originalParameters = getParametersAsPropertyList((TypeScriptFunction) extractedClass.getConstructor());
+                    }
 
-            adjustConstructor(extractedClass, selectedProperties);
-            addGetterAndSetter(extractedClass, selectedProperties);
+                    extractedClass = PsiUtil.makeClassExported(extractedClass);
+                    assert extractedClass != null;
+                    Index.updateClass(extractedClass); // since the class was replaced the index must be updated
 
-            // refactor the function calls of the extracted class since the constructor was adjusted
-            TypeScriptFunction constructor = (TypeScriptFunction) extractedClass.getConstructor();
-            assert constructor != null;
-            HashMap<Classfield, String> defaultValues = new HashMap<>();
-            getDefaultValues(extractedClass, selectedProperties, defaultValues);
+                    adjustConstructor(extractedClass, selectedProperties);
+                    addGetterAndSetter(extractedClass, selectedProperties);
 
-            refactorConstructorCalls(constructor, originalParameters, defaultValues);
-        }
+                    // refactor the function calls of the extracted class since the constructor was adjusted
+                    TypeScriptFunction constructor = (TypeScriptFunction) extractedClass.getConstructor();
+                    assert constructor != null;
+                    HashMap<Classfield, String> defaultValues = new HashMap<>();
+                    getDefaultValues(extractedClass, selectedProperties, defaultValues);
 
-        TypeScriptClass finalExtractedClass = extractedClass;
-        WriteCommandAction.runWriteCommandAction(project, () -> {
-            CodeStyleManager.getInstance(project).reformat(finalExtractedClass);
-        });
+                    refactorConstructorCalls(constructor, originalParameters, defaultValues);
+                }
 
-        List<Classfield> dataClump = new ArrayList<>();
-        for (Property property : selectedProperties) {
-            dataClump.add(PsiUtil.getClassfield(extractedClass, property.getName()));
-        }
+                TypeScriptClass finalExtractedClass = extractedClass;
+                WriteCommandAction.runWriteCommandAction(project, () -> {
+                    CodeStyleManager.getInstance(project).reformat(finalExtractedClass);
+                });
 
-        // refactor the elements that contain the data clump
-        refactorElement(currentElement, extractedClass, dataClump, currentDefinedClassFields, currentDefaultValues);
-        refactorElement(otherElement, extractedClass, dataClump, otherDefinedClassFields, otherDefaultValues);
+                List<Classfield> dataClump = new ArrayList<>();
+                for (Property property : selectedProperties) {
+                    dataClump.add(PsiUtil.getClassfield(extractedClass, property.getName()));
+                }
 
-        WriteCommandAction.runWriteCommandAction(project, () -> {
-            CodeStyleManager.getInstance(project).reformat(currentElement);
-            CodeStyleManager.getInstance(project).reformat(otherElement);
+                // refactor the elements that contain the data clump
+                refactorElement(currentElement, extractedClass, dataClump, currentDefinedClassFields, currentDefaultValues);
+                refactorElement(otherElement, extractedClass, dataClump, otherDefinedClassFields, otherDefaultValues);
+
+                WriteCommandAction.runWriteCommandAction(project, () -> {
+                    CodeStyleManager.getInstance(project).reformat(currentElement);
+                    CodeStyleManager.getInstance(project).reformat(otherElement);
+                });
+
+            });
         });
 
     }

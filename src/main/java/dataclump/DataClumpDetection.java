@@ -24,6 +24,7 @@ import java.util.*;
  */
 public class DataClumpDetection extends LocalInspectionTool {
 
+
     /**
      * Build the visitor for the inspection
      *
@@ -44,17 +45,18 @@ public class DataClumpDetection extends LocalInspectionTool {
             @Override
             public void visitJSParameterList(@NotNull JSParameterList parameterList) {
 
-                TypeScriptFunction psiFunction = PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class);
+                TypeScriptFunction psiFunction = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class));
                 assert psiFunction != null;
-                if (!psiFunction.isValid()) CodeSmellLogger.error("Invalid Function: " + psiFunction, new Exception());
+                if (!PsiUtil.runReadActionWithResult(psiFunction::isValid))
+                    CodeSmellLogger.error("Invalid Function: " + psiFunction, new Exception());
 
                 // Skip constructors
-                if (psiFunction.isConstructor()) return;
+                if (PsiUtil.runReadActionWithResult(psiFunction::isConstructor)) return;
                 // Update the index
                 Index.updateFunction(psiFunction);
                 // Detect data clumps if the number of parameters is greater than the required minimum
                 List<Parameter> parameters = Index.getFunctionsToParameters().get(psiFunction);
-                if ( parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
                     detectDataClump(psiFunction, holder);
                 }
                 super.visitJSParameterList(parameterList);
@@ -198,7 +200,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         // functions that are overridden can not be refactored since the overridden functions would be affected
         if (element instanceof TypeScriptFunction function) {
             if (isOverritten(function)) return false;
-            JSClass containingClass = PsiTreeUtil.getParentOfType(element, JSClass.class);
+            JSClass containingClass = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(element, JSClass.class));
             return !(containingClass instanceof TypeScriptInterface);
         } else return !(element instanceof TypeScriptInterface);
     }
@@ -213,7 +215,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         List<JSClass> classesWithFunction = Index.getFunctionNamesToClasses().get(function.getName());
         if (classesWithFunction == null) return false;
         for (JSClass psiClass : classesWithFunction) {
-            TypeScriptFunction otherFunction = (TypeScriptFunction) psiClass.findFunctionByName(function.getName());
+            TypeScriptFunction otherFunction = PsiUtil.runReadActionWithResult(() -> (TypeScriptFunction) psiClass.findFunctionByName(function.getName()));
             if (otherFunction != null && isOverriding(function, otherFunction)) return true;
         }
         return false;
@@ -345,12 +347,12 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @return true if the function is overriding another function, false otherwise
      */
     private boolean isOverriding(TypeScriptFunction function) {
-        JSClass containingClass = PsiTreeUtil.getParentOfType(function, JSClass.class);
+        JSClass containingClass = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function, JSClass.class));
         if (containingClass == null) return false;
 
         for (JSClass psiClass : new ArrayList<>(resolveHierarchy(containingClass))) {
             if (psiClass == containingClass) continue;
-            if (psiClass.findFunctionByName(function.getName()) != null) {
+            if (PsiUtil.runReadActionWithResult(()->psiClass.findFunctionByName(function.getName()) != null)) {
                 return true;
             }
         }
@@ -367,15 +369,15 @@ public class DataClumpDetection extends LocalInspectionTool {
     private boolean isOverriding(TypeScriptFunction function1, TypeScriptFunction function2) {
 
         if (!Objects.equals(function1.getName(), function2.getName())) return false;
-        JSClass containingClass1 = PsiTreeUtil.getParentOfType(function1, JSClass.class);
+        JSClass containingClass1 = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function1, JSClass.class));
         if (containingClass1 == null) return false;
-        JSClass containingClass2 = PsiTreeUtil.getParentOfType(function2, JSClass.class);
+        JSClass containingClass2 = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function2, JSClass.class));
         if (containingClass2 == null) return false;
         if (containingClass1 == containingClass2) return false;
 
         List<JSClass> commonClasses = new ArrayList<>(getCommonClassesInHierarchy(containingClass1, containingClass2));
         for (JSClass commonClass : commonClasses) {
-            if (commonClass.findFunctionByName(function1.getName()) != null) {
+            if (PsiUtil.runReadActionWithResult(() -> commonClass.findFunctionByName(function1.getName()) != null)) {
                 return true;
             }
         }
@@ -392,7 +394,7 @@ public class DataClumpDetection extends LocalInspectionTool {
     private boolean isOverriding(JSClass psiClass, PsiElement psiElement) {
         for (JSClass superClass : new ArrayList<>(resolveHierarchy(psiClass))) {
             if (superClass == psiClass) continue;
-            if (superClass instanceof TypeScriptInterface && superClass.findFieldByName(PsiUtil.getName(psiElement)) != null) {
+            if (superClass instanceof TypeScriptInterface && PsiUtil.runReadActionWithResult(() -> superClass.findFieldByName(PsiUtil.getName(psiElement))) != null) {
                 return true;
             }
         }
@@ -429,17 +431,15 @@ public class DataClumpDetection extends LocalInspectionTool {
         superClasses.add(tsClass);
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            ApplicationManager.getApplication().runReadAction(() -> {
 
-                for (JSClass psiClass : tsClass.getSuperClasses()) {
-                    superClasses.addAll(resolveHierarchy(psiClass));
-                }
+            for (JSClass psiClass : PsiUtil.runReadActionWithResult(tsClass::getSuperClasses)) {
+                superClasses.addAll(resolveHierarchy(psiClass));
+            }
 
-                for (JSClass psiClass : tsClass.getImplementedInterfaces()) {
-                    superClasses.addAll(resolveHierarchy(psiClass));
-                }
+            for (JSClass psiClass : PsiUtil.runReadActionWithResult(tsClass::getImplementedInterfaces)) {
+                superClasses.addAll(resolveHierarchy(psiClass));
+            }
 
-            });
         });
 
         return superClasses;

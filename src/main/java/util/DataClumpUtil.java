@@ -5,6 +5,7 @@ import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.lang.javascript.psi.JSParameterList;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecmal4.JSClass;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
@@ -35,12 +36,13 @@ public class DataClumpUtil {
 
         // if the element is a function, get the parameter list
         if (psiElement instanceof TypeScriptFunction) {
-            psiElement = PsiTreeUtil.getChildOfType(psiElement, JSParameterList.class);
+            @NotNull PsiElement finalPsiElement = psiElement;
+            psiElement = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getChildOfType(finalPsiElement, JSParameterList.class));
         }
 
         assert psiElement != null;
-        PsiFile psiFile = psiElement.getContainingFile();
-        Project project = psiFile.getProject();
+        PsiFile psiFile = PsiUtil.runReadActionWithResult(psiElement::getContainingFile);
+        Project project = PsiUtil.runReadActionWithResult(psiFile::getProject);
 
         ProblemsHolder problemsHolder = new ProblemsHolder(
                 InspectionManager.getInstance(project),
@@ -51,7 +53,8 @@ public class DataClumpUtil {
         DataClumpDetection inspection = new DataClumpDetection();
         PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
 
-        psiElement.accept(visitor);
+        @NotNull PsiElement finalPsiElement1 = psiElement;
+        ApplicationManager.getApplication().runReadAction(() -> finalPsiElement1.accept(visitor));
 
         return problemsHolder;
     }
