@@ -16,6 +16,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
+import evoluation.DiagnosticTool;
 
 import java.util.*;
 
@@ -344,6 +345,13 @@ public class Index {
      */
     public static void resetIndex(Project project) {
 
+        long startTime;
+        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+            startTime = System.nanoTime();
+        } else {
+            startTime = 0;
+        }
+
         indexBuilt = false;
         Index.project = project;
 
@@ -399,13 +407,15 @@ public class Index {
 
 
             indexBuilt = true;
+
+            if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                long endTime = System.nanoTime();
+                long duration = endTime - startTime;
+                DiagnosticTool.addMeasurement(new DiagnosticTool.IndexMeasurement(project, duration));
+            }
+
             notifyListeners();
             CodeSmellLogger.info("Index was build.");
-
-            //printClassFieldsToClasses();
-            //printParametersToFunctions();
-            //printClassesToClassFields();
-            //printFunctionsToParameter();
         });
 
     }

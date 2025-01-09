@@ -1,18 +1,17 @@
 package evoluation;
 
 import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
+import dataclump.FullAnalysis;
 import util.CodeSmellLogger;
+import util.Index;
 import util.Property;
 import util.PsiUtil;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -30,7 +29,9 @@ public class DiagnosticTool {
     /**
      * The path to the file where the measurements are stored.
      */
-    private static String FILE_PATH;
+    private static String FILE_PATH_DETECTION;
+    private static String FILE_PATH_FULL_ANALYSIS;
+    private static String FILE_PATH_INDEX;
 
 
     /**
@@ -39,46 +40,50 @@ public class DiagnosticTool {
      * @param project the project to be analyzed
      */
     public static void init(Project project) {
+        String resultPath = System.getProperty("dataclump.resultpath");
+
+        if (resultPath == null || resultPath.isEmpty()) {
+            CodeSmellLogger.error("Invalid result path: " + resultPath, new IllegalArgumentException());
+            return;
+        }
         DIAGNOSTIC_MODE = true;
-        FILE_PATH = "\\C:\\Users\\ms\\Documents\\Uni\\Bachlorarbeit\\Messungen\\" + "measurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_DETECTION = resultPath + "\\detectionMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_INDEX = resultPath + "\\indexMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+
+        Index.addIndexBuildListener( () -> FullAnalysis.run(resultPath + "\\fullAnalysis_" + project.getName() + "_" + getCurrentDateTime() + ".json"));
     }
 
-    /**
-     * Adds a new measurement to the file.
-     *
-     * @param newMeasurement the measurement to be added
-     */
-    public static void addMeasurement(Measurement newMeasurement) {
-        List<Measurement> measurements;
+    public static void addMeasurement(DetectionMeasurement newMeasurement) {
+        writeToFile(FILE_PATH_DETECTION, newMeasurement);
+    }
 
-        Gson gson = new GsonBuilder().registerTypeAdapter(Measurement.class, new MeasurementAdapter()).setPrettyPrinting().create();
-        File file = new File(FILE_PATH);
+    public static void addMeasurement(FullAnalysisMeasurement newMeasurement) {
+        writeToFile(FILE_PATH_FULL_ANALYSIS, newMeasurement);
+    }
 
-        // if the file exists, read the existing measurements
-        if (file.exists()) {
-            try (FileReader reader = new FileReader(file)) {
-                Type listType = new TypeToken<List<Measurement>>() {
-                }.getType();
-                measurements = gson.fromJson(reader, listType);
-            } catch (IOException e) {
-                CodeSmellLogger.error("Could not read file: " + FILE_PATH, e);
-                return;
+    public static void addMeasurement(FullAnalysisFileMeasurement newMeasurement) {
+        writeToFile(FILE_PATH_FULL_ANALYSIS, newMeasurement);
+    }
+
+    public static void addMeasurement(IndexMeasurement newMeasurement) {
+        writeToFile(FILE_PATH_INDEX, newMeasurement);
+    }
+
+
+    public static <T> void writeToFile(String path, T newMeasurement) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        File file = new File(path);
+        try (FileWriter writer = new FileWriter(path, true)) {
+            if (file.exists() && file.length() > 0) {
+                writer.write(",");
             }
-        } else {
-            // otherwise, create a new list
-            measurements = new ArrayList<>();
-        }
+            gson.toJson(newMeasurement, writer);
 
-        // add the new measurement to the list
-        measurements.add(newMeasurement);
-
-        // write the measurements back to the file
-        try (FileWriter writer = new FileWriter(FILE_PATH)) {
-            gson.toJson(measurements, writer);
         } catch (IOException e) {
-            CodeSmellLogger.error("Could not write file: " + FILE_PATH, e);
+            CodeSmellLogger.error("Could not write to file: " + path, e);
         }
-
     }
 
     /**
@@ -93,33 +98,19 @@ public class DiagnosticTool {
         return now.format(formatter);
     }
 
-    /**
-     * Represents a measurement of the plugin.
-     */
-    public static abstract class Measurement {
-        protected final String name;
-        protected final String project;
-        protected final String timeOfMeasurement;
-        protected final double durationInMilliSeconds;
+    public static class DetectionMeasurement {
+        String measurementType = "Detection";
+        String project;
+        String timeOfMeasurement;
+        double durationInMilliSeconds;
+        String element1;
+        String element2;
+        List<String> dataClump;
 
-        public Measurement(String name, String projectName, String timeOfMeasurement, double durationInMilliSeconds) {
-            this.name = name;
-            this.project = projectName;
-            this.timeOfMeasurement = timeOfMeasurement;
-            this.durationInMilliSeconds = durationInMilliSeconds;
-        }
-    }
-
-    /**
-     * Represents a measurement of the inspection for detection of data clumps.
-     */
-    public static class InspectionDetectionMeasurement extends Measurement {
-        private final String element1;
-        private final String element2;
-        private final List<String> dataClump;
-
-        public InspectionDetectionMeasurement(Project project, PsiElement element1, PsiElement element2, List<Property> dataClump, long durationNanoSeconds) {
-            super("InspectionDetection", project.getName(), getCurrentDateTime(), durationNanoSeconds / 1000000.0);
+        public DetectionMeasurement(Project project, PsiElement element1, PsiElement element2, List<Property> dataClump, long durationNanoSeconds) {
+            this.project = project.getName();
+            this.timeOfMeasurement = getCurrentDateTime();
+            this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
             this.element1 = PsiUtil.getQualifiedName(element1);
             this.element2 = PsiUtil.getQualifiedName(element2);
             this.dataClump = new ArrayList<>();
@@ -127,70 +118,46 @@ public class DiagnosticTool {
                 this.dataClump.add(property.toString());
             }
         }
-
-        public InspectionDetectionMeasurement(String project, String timeOfMeasurement, String element1, String element2, List<String> dataClump, long durationNanoSeconds) {
-            super("InspectionDetection", project, timeOfMeasurement, durationNanoSeconds / 1000000.0);
-            this.element1 = element1;
-            this.element2 = element2;
-            this.dataClump = dataClump;
-        }
     }
 
-    /**
-     * Represents a measurement of the full analysis of the project.
-     */
-    public static class FullAnalysisMeasurement extends Measurement {
+    public static class FullAnalysisMeasurement {
+        String measurementType = "FullAnalysis";
+        String project;
+        String timeOfMeasurement;
+        double durationInMilliSeconds;
 
         public FullAnalysisMeasurement(Project project, long durationNanoSeconds) {
-            super("FullAnalysis", project.getName(), getCurrentDateTime(), durationNanoSeconds / 1000000.0);
+            this.project = project.getName();
+            this.timeOfMeasurement = getCurrentDateTime();
+            this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
         }
 
-        public FullAnalysisMeasurement(String project, String timeOfMeasurement, long durationNanoSeconds) {
-            super("FullAnalysis", project, timeOfMeasurement, durationNanoSeconds / 1000000.0);
-        }
     }
 
-    /**
-     * Custom adapter for the Measurement class to serialize and deserialize it correctly.
-     */
-    public static class MeasurementAdapter implements JsonSerializer<Measurement>, JsonDeserializer<Measurement> {
+    public static class FullAnalysisFileMeasurement {
+        String measurementType = "FullAnalysisFile";
+        String file;
+        String timeOfMeasurement;
+        double durationInMilliSeconds;
 
-        @Override
-        public JsonElement serialize(Measurement src, Type typeOfSrc, JsonSerializationContext context) {
-            JsonObject jsonObject = new JsonObject();
-            jsonObject.addProperty("project", src.project);
-            jsonObject.addProperty("timeOfMeasurement", src.timeOfMeasurement);
-            jsonObject.addProperty("durationInMilliSeconds", src.durationInMilliSeconds);
-
-            if (src instanceof InspectionDetectionMeasurement inspection) {
-                jsonObject.addProperty("element1", inspection.element1);
-                jsonObject.addProperty("element2", inspection.element2);
-                jsonObject.add("dataClump", context.serialize(inspection.dataClump));
-            }
-
-            return jsonObject;
+        public FullAnalysisFileMeasurement(String file, long durationNanoSeconds) {
+            this.file = file;
+            this.timeOfMeasurement = getCurrentDateTime();
+            this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
         }
 
-        @Override
-        public Measurement deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            CodeSmellLogger.info("Deserializing measurement: " + json.toString());
-
-            JsonObject jsonObject = json.getAsJsonObject();
-            String project = jsonObject.get("project").getAsString();
-            String timeOfMeasurement = jsonObject.get("timeOfMeasurement").getAsString();
-            double durationInMilliSeconds = jsonObject.get("durationInMilliSeconds").getAsDouble();
-
-            if (jsonObject.has("element1")) {  // Inspecting if it's an InspectionDetectionMeasurement
-                String element1 = jsonObject.get("element1").getAsString();
-                String element2 = jsonObject.get("element2").getAsString();
-                List<String> dataClump = context.deserialize(jsonObject.get("dataClump"), List.class);
-                return new InspectionDetectionMeasurement(project, timeOfMeasurement, element1, element2, dataClump, (long) durationInMilliSeconds);
-            } else {  // Otherwise, it's a FullAnalysisMeasurement
-                double excludingWriteOps = jsonObject.get("durationInMilliSecondsExcludingWriteOperations").getAsDouble();
-                return new FullAnalysisMeasurement(project, timeOfMeasurement, (long) durationInMilliSeconds);
-            }
-        }
     }
 
+    public static class IndexMeasurement {
+        String measurementType = "Index";
+        String project;
+        String timeOfMeasurement;
+        double durationInMilliSeconds;
 
+        public IndexMeasurement(Project project, long durationNanoSeconds) {
+            this.project = project.getName();
+            this.timeOfMeasurement = getCurrentDateTime();
+            this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
+        }
+    }
 }

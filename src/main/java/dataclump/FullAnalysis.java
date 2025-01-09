@@ -121,6 +121,10 @@ public class FullAnalysis extends AnAction {
                 // iterate all TypeScript files in the project
                 for (VirtualFile virtualFile : typescriptFiles) {
                     Index.printSize();
+                    long startTimeFile = 0;
+                    if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                        startTimeFile = System.nanoTime();
+                    }
 
                     // all data clump problems for the file
                     List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
@@ -185,12 +189,17 @@ public class FullAnalysis extends AnAction {
                         writeToFile(dataClumpProblems, virtualFile, resultPath);
                     }
                     count++;
+                    if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                        long endTimeFile = System.nanoTime();
+                        long durationFile = (endTimeFile - startTimeFile);
+                        DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisFileMeasurement(virtualFile.getName(), durationFile));
+                    }
                 }
 
 
                 if (DiagnosticTool.DIAGNOSTIC_MODE) {
                     long endTime = System.nanoTime();
-                    long duration = (endTime - startTime) / 1000000;
+                    long duration = (endTime - startTime);
                     DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisMeasurement(project, duration));
                 }
             }

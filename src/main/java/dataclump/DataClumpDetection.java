@@ -178,7 +178,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                         if (DiagnosticTool.DIAGNOSTIC_MODE) {
                             long end = System.nanoTime();
                             long time = end - start;
-                            DiagnosticTool.addMeasurement(new DiagnosticTool.InspectionDetectionMeasurement(Index.getProject(), currentElement, otherElement, matchingProperties, time));
+                            DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), currentElement, otherElement, matchingProperties, time));
                         }
 
                     }
