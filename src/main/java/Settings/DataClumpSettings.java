@@ -38,8 +38,7 @@ public final class DataClumpSettings implements PersistentStateComponent<DataClu
         @NonNls
         public int minNumberOfProperties = 3;
         public Modifier includeModifiersInDetection = Modifier.ALL;
-        public Modifier includeModifiersInExtractedClass = Modifier.ALL; ;
-        public boolean includeFieldsInSameHierarchy = true;
+        public Modifier includeModifiersInExtractedClass = Modifier.ALL;
     }
 
     /**

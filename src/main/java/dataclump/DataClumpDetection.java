@@ -160,18 +160,20 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                         assert dataClumpElement != null;
 
+                        String currentElementType = currentElement instanceof JSClass ? "class" : "function";
+                        String otherElementType = otherElement instanceof JSClass ? "class" : "function";
+
+                        String description = "Data Clump between " + currentElementType + " " + PsiUtil.getQualifiedName(currentElement) +
+                                " and " + otherElementType + " " + PsiUtil.getQualifiedName(otherElement) +
+                                ". Matching Properties " + matchingProperties + ".";
+
                         if (canRefactor(currentElement) && canRefactor(otherElement)) {
                             holder.registerProblem(dataClumpElement,
-                                    "Data Clump between " + PsiUtil.getQualifiedName(currentElement) +
-                                            " and " + PsiUtil.getQualifiedName(otherElement) +
-                                            ". Matching Properties " + matchingProperties + ".",
+                                    description,
                                     new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
                         } else {
-                            holder.registerProblem(dataClumpElement,
-                                    "Data Clump between " + PsiUtil.getQualifiedName(currentElement) +
-                                            " and " + PsiUtil.getQualifiedName(otherElement) +
-                                            ". Matching Properties " + matchingProperties +
-                                            ". This Data Clump can not be automatically refactored."
+                            holder.registerProblem(dataClumpElement, description +
+                                    " This data clump can not be refactored automatically."
                             );
                         }
 
@@ -350,7 +352,9 @@ public class DataClumpDetection extends LocalInspectionTool {
         JSClass containingClass = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function, JSClass.class));
         if (containingClass == null) return false;
 
-        for (JSClass psiClass : new ArrayList<>(resolveHierarchy(containingClass))) {
+        List<JSClass> hierarchy = resolveHierarchy(containingClass);
+        if (hierarchy.isEmpty()) return false;
+        for (JSClass psiClass : hierarchy) {
             if (psiClass == containingClass) continue;
             if (PsiUtil.runReadActionWithResult(()->psiClass.findFunctionByName(function.getName()) != null)) {
                 return true;
@@ -392,7 +396,11 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @return true if the field is overriding another field of an interface, false otherwise
      */
     private boolean isOverriding(JSClass psiClass, PsiElement psiElement) {
-        for (JSClass superClass : new ArrayList<>(resolveHierarchy(psiClass))) {
+        List<JSClass> hierarchy =
+                resolveHierarchy(psiClass);
+        if (hierarchy.isEmpty()) return false;
+
+        for (JSClass superClass : hierarchy) {
             if (superClass == psiClass) continue;
             if (superClass instanceof TypeScriptInterface && PsiUtil.runReadActionWithResult(() -> superClass.findFieldByName(PsiUtil.getName(psiElement))) != null) {
                 return true;
@@ -411,8 +419,8 @@ public class DataClumpDetection extends LocalInspectionTool {
     private List<JSClass> getCommonClassesInHierarchy(JSClass class1, JSClass class2) {
         if (class1 == null || class2 == null) return new ArrayList<>();
 
-        List<JSClass> superClasses1 = new ArrayList<>(resolveHierarchy(class1));
-        List<JSClass> superClasses2 = new ArrayList<>(resolveHierarchy(class2));
+        List<JSClass> superClasses1 = resolveHierarchy(class1);
+        List<JSClass> superClasses2 = resolveHierarchy(class2);
 
         superClasses1.retainAll(superClasses2);
 
@@ -428,21 +436,30 @@ public class DataClumpDetection extends LocalInspectionTool {
     private List<JSClass> resolveHierarchy(JSClass tsClass) {
 
         List<JSClass> superClasses = new ArrayList<>();
-        superClasses.add(tsClass);
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            superClasses.add(tsClass);
+            List<JSClass> extendedClasses = new ArrayList<>();
+            List<JSClass> implementedInterfaces = new ArrayList<>();
 
-            for (JSClass psiClass : PsiUtil.runReadActionWithResult(tsClass::getSuperClasses)) {
+            ApplicationManager.getApplication().runReadAction(() -> {
+                extendedClasses.addAll(Arrays.asList(tsClass.getSuperClasses()));
+                implementedInterfaces.addAll(Arrays.asList(tsClass.getImplementedInterfaces()));
+            });
+
+            for (JSClass psiClass : extendedClasses) {
                 superClasses.addAll(resolveHierarchy(psiClass));
             }
 
-            for (JSClass psiClass : PsiUtil.runReadActionWithResult(tsClass::getImplementedInterfaces)) {
+            for (JSClass psiClass : implementedInterfaces) {
                 superClasses.addAll(resolveHierarchy(psiClass));
             }
 
         });
 
-        return superClasses;
+        ArrayList<JSClass> copyResult = new ArrayList<>(superClasses);
+        copyResult.removeIf(Objects::isNull);
+        return copyResult;
     }
 
 }

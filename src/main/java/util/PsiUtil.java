@@ -380,7 +380,6 @@ public class PsiUtil {
      */
     public static JSExpressionStatement getSuperCall(JSBlockStatement body) {
         if (body != null) {
-            CodeSmellLogger.info(body.getText());
             JSSuperExpression superKey = runReadActionWithResult(() -> PsiTreeUtil.findChildOfType(body, JSSuperExpression.class));
             if (superKey != null) {
                 return runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(superKey, JSExpressionStatement.class));
@@ -803,8 +802,15 @@ public class PsiUtil {
      * @return The qualified name of the given element if it has one or the name otherwise.
      */
     public static String getQualifiedName(PsiElement element) {
-        if (element instanceof PsiQualifiedNamedElement namedElement) {
-            return runReadActionWithResult(namedElement::getQualifiedName);
+        // functions and classes are not PsiQualifiedNamedElements but have a qualified name
+        if (element instanceof TypeScriptFunction function) {
+            String name = runReadActionWithResult(function::getQualifiedName);
+            if (name != null) return name;
+        } else if(element instanceof TypeScriptClass clazz) {
+            String name = runReadActionWithResult(clazz::getQualifiedName);
+            if (name != null) return name;
+        } else if (element instanceof PsiQualifiedNamedElement) {
+            return runReadActionWithResult(((PsiQualifiedNamedElement) element)::getQualifiedName);
         }
         return getName(element);
     }

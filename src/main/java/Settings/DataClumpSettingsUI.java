@@ -20,7 +20,6 @@ public class DataClumpSettingsUI {
     private final ComboBox<Integer> numberOfProperties;
     private final ComboBox<DataClumpSettings.Modifier> includeModifiersInDetection = new ComboBox<>(DataClumpSettings.Modifier.values());
     private final ComboBox<DataClumpSettings.Modifier> includeModifiersInExtractedClass = new ComboBox<>();
-    private final JCheckBox includeFieldsInSameHierarchy = new JCheckBox("Include Fields in Same Hierarchy");
 
     /**
      * Creates a new instance of the settings UI
@@ -42,7 +41,6 @@ public class DataClumpSettingsUI {
             includeModifiersInExtractedClass.addItem(DataClumpSettings.Modifier.ALL);
         }
         includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
-        includeFieldsInSameHierarchy.setSelected(DataClumpSettings.getInstance().getState().includeFieldsInSameHierarchy);
 
         String TOOLTIP_NUMBER_OF_PROPERTIES = "The minimal number of fields or parameters that should be equal in order to be considered a data clump.";
         String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "Select the modifier types that should be considered when detecting data clumps. " +
@@ -55,15 +53,11 @@ public class DataClumpSettingsUI {
                 "In case of VISIBILITY only the visibility modifiers will be included in the extracted class. " +
                 "In case of NONE no modifiers will be included in the extracted class." +
                 "The selected modifier must be included in the detected data clumps.";
-        String TOOLTIP_INCLUDE_FIELDS_IN_SAME_HIERARCHY = "If selected, fields in the same hierarchy will be considered when detecting data clumps. " +
-                "In this case, fields in the same hierarchy can form a data clump. " +
-                "If deselected fields in the same hierarchy can not data clumps.";
 
         mainPanel = FormBuilder.createFormBuilder()
                 .addComponent(new JBLabel("Settings for data clump detection: "))
                 .addLabeledComponent(new JBLabel("Number of Fields or Parameters: "), addHelpToolTip(numberOfProperties, TOOLTIP_NUMBER_OF_PROPERTIES), 1, false)
                 .addLabeledComponent(new JBLabel("Include modifiers in detection: "),addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1)
-                .addComponent(addHelpToolTip(includeFieldsInSameHierarchy, TOOLTIP_INCLUDE_FIELDS_IN_SAME_HIERARCHY), 1)
                 .addComponent(new JBLabel("Settings for extracting class: "))
                 .addLabeledComponent(new JBLabel("Include modifiers in the extracted class: "),addHelpToolTip(includeModifiersInExtractedClass, TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS), 1)
                 .addComponentFillVertically(new JPanel(), 0)
@@ -142,14 +136,6 @@ public class DataClumpSettingsUI {
 
     public DataClumpSettings.Modifier getIncludeModifiersInExtractedClass() {
         return (DataClumpSettings.Modifier) includeModifiersInExtractedClass.getSelectedItem();
-    }
-
-    public void setIncludeFieldsInSameHierarchy(boolean value) {
-        includeFieldsInSameHierarchy.setSelected(value);
-    }
-
-    public boolean getIncludeFieldsInSameHierarchy() {
-        return includeFieldsInSameHierarchy.isSelected();
     }
 
     public JPanel getPanel() {

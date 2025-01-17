@@ -92,7 +92,7 @@ public class DiagnosticTool {
      *
      * @return the current date and time
      */
-    private static String getCurrentDateTime() {
+    public static String getCurrentDateTime() {
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
         return now.format(formatter);

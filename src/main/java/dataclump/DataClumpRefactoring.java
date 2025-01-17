@@ -622,7 +622,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // iterate over all classfields of the class
         for (Classfield classfield : classfields) {
-            CodeSmellLogger.info(classfield.toString());
             // if the classfield is one of the extracted properties -> refactor the references
             if (dataClump.contains(classfield)) {
 
@@ -774,11 +773,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
      */
     private void refactorConstructorCalls(TypeScriptFunction constructor, List<Property> originalParameters, HashMap<Classfield, String> defaultValues) {
         if (!constructor.isConstructor()) return;
-        CodeSmellLogger.info(constructor.getText());
 
         HashMap<Parameter, Classfield> definingParameter = new HashMap<>();
         getClassfieldDefiningParameter(constructor, definingParameter, new HashMap<>());
-        CodeSmellLogger.info("Defining " + definingParameter);
 
         for (PsiReference functionCall : ReferencesSearch.search(constructor)) {
 
@@ -790,7 +787,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
             StringBuilder updatedArguments = new StringBuilder("(");
 
             for (JSParameterListElement currentPsiParameter : constructor.getParameters()) {
-                CodeSmellLogger.info("Current PsiParameter: " + currentPsiParameter);
                 Parameter currentParameter = new Parameter((TypeScriptParameter) currentPsiParameter);
 
                 String currentValue;
@@ -854,8 +850,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         for (PsiReference functionCall : ReferencesSearch.search(function)) {
 
+            CodeSmellLogger.info("Refactoring function call... " + functionCall.getElement().getText());
             JSArgumentList argumentList = PsiTreeUtil.getNextSiblingOfType(functionCall.getElement(), JSArgumentList.class);
-            assert argumentList != null;
+            if (argumentList == null) continue;
             JSExpression[] originalArguments = argumentList.getArguments();
 
             // create the new argument list
@@ -1065,17 +1062,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
      */
     private void replaceReferenceWithGetter(TypeScriptClass psiClass, PsiReference reference, String fieldName, String propertyName, boolean isFieldReference) {
         String expressionText;
-        CodeSmellLogger.info("Replacing reference with getter: " + reference.getElement().getText());
-        CodeSmellLogger.info("Fieldname: " + fieldName);
-        CodeSmellLogger.info("Propertyname: " + propertyName);
-        CodeSmellLogger.info("Is field reference: " + isFieldReference);
         if (PsiTreeUtil.getParentOfType(reference.getElement(), TypeScriptClass.class) == psiClass && isFieldReference) {
             expressionText = "this." + fieldName + "." + propertyName;
         } else {
             expressionText = fieldName + "." + propertyName;
         }
-
-        CodeSmellLogger.info("New expression: " + expressionText);
 
         JSExpression newExpression = JSPsiElementFactory.createJSExpression(expressionText, reference.getElement());
         WriteCommandAction.runWriteCommandAction(reference.getElement().getProject(), () -> {

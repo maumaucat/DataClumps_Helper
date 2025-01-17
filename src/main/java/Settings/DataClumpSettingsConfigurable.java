@@ -41,8 +41,7 @@ final class DataClumpSettingsConfigurable implements Configurable {
                 Objects.requireNonNull(DataClumpSettings.getInstance().getState());
         return mySettingsComponent.getNumberOfProperties() != state.minNumberOfProperties
                 || mySettingsComponent.getIncludeModifiersInDetection() != state.includeModifiersInDetection
-                || mySettingsComponent.getIncludeModifiersInExtractedClass() != state.includeModifiersInExtractedClass
-                || mySettingsComponent.getIncludeFieldsInSameHierarchy() != state.includeFieldsInSameHierarchy;
+                || mySettingsComponent.getIncludeModifiersInExtractedClass() != state.includeModifiersInExtractedClass;
     }
 
     @Override
@@ -51,7 +50,6 @@ final class DataClumpSettingsConfigurable implements Configurable {
         state.minNumberOfProperties = mySettingsComponent.getNumberOfProperties();
         state.includeModifiersInDetection = mySettingsComponent.getIncludeModifiersInDetection();
         state.includeModifiersInExtractedClass = mySettingsComponent.getIncludeModifiersInExtractedClass();
-        state.includeFieldsInSameHierarchy = mySettingsComponent.getIncludeFieldsInSameHierarchy();
     }
 
 
@@ -62,7 +60,6 @@ final class DataClumpSettingsConfigurable implements Configurable {
         mySettingsComponent.setNumberOfProperties(state.minNumberOfProperties);
         mySettingsComponent.setIncludeModifiersInDetection(state.includeModifiersInDetection);
         mySettingsComponent.setIncludeModifiersInExtractedClass(state.includeModifiersInExtractedClass);
-        mySettingsComponent.setIncludeFieldsInSameHierarchy(state.includeFieldsInSameHierarchy);
     }
 
     @Override

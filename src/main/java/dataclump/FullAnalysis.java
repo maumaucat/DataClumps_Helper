@@ -1,8 +1,7 @@
 package dataclump;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import Settings.DataClumpSettings;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.lang.javascript.TypeScriptFileType;
@@ -32,9 +31,9 @@ import org.jetbrains.annotations.NotNull;
 import util.CodeSmellLogger;
 import util.DataClumpUtil;
 import util.Index;
+import util.PsiUtil;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -118,6 +117,10 @@ public class FullAnalysis extends AnAction {
 
                 int numberOfFiles = typescriptFiles.size();
                 int count = 1;
+
+                // all data clump problems
+                List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
+
                 // iterate all TypeScript files in the project
                 for (VirtualFile virtualFile : typescriptFiles) {
                     Index.printSize();
@@ -126,12 +129,8 @@ public class FullAnalysis extends AnAction {
                         startTimeFile = System.nanoTime();
                     }
 
-                    // all data clump problems for the file
-                    List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
-
                     CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + " (" + count + "/" + numberOfFiles + ")"
                             + " - " + virtualFile.getLength());
-
 
                     // read the psiFile in a read action
                     final PsiFile[] psiFileWrap = new PsiFile[1]; // Using an array to make it effectively final
@@ -150,7 +149,7 @@ public class FullAnalysis extends AnAction {
                     for (TypeScriptFunction psiElement : functions) {
                         ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
                         assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems);
+                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
                     }
 
                     // collect all classes in the file in a read action
@@ -165,7 +164,7 @@ public class FullAnalysis extends AnAction {
                     for (PsiElement psiElement : allClasses) {
                         ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
                         assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems);
+                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
                     }
 
                     // collect all interfaces in the file in a read action
@@ -180,14 +179,9 @@ public class FullAnalysis extends AnAction {
                     for (PsiElement psiElement : allInterfaces) {
                         ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
                         assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems);
+                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
                     }
 
-
-                    // log DataClumpProblems for the file
-                    if (!dataClumpProblems.isEmpty()) {
-                        writeToFile(dataClumpProblems, virtualFile, resultPath);
-                    }
                     count++;
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
                         long endTimeFile = System.nanoTime();
@@ -196,6 +190,21 @@ public class FullAnalysis extends AnAction {
                     }
                 }
 
+                // general info
+                HashMap<String, String> settings = new HashMap<>();
+                settings.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
+                settings.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
+                settings.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
+
+
+                writeToFile(dataClumpProblems,
+                        new GeneralInformation(
+                                project.getName(),
+                                DiagnosticTool.getCurrentDateTime(),
+                                settings,
+                                numberOfFiles,
+                                dataClumpProblems.size())
+                        , resultPath);
 
                 if (DiagnosticTool.DIAGNOSTIC_MODE) {
                     long endTime = System.nanoTime();
@@ -206,6 +215,7 @@ public class FullAnalysis extends AnAction {
         });
     }
 
+
     /**
      * Collects the data clump problems from the ProblemsHolder and adds them to the list of data clump problems.
      * The data clump problems are extracted from the description of the ProblemDescriptors.
@@ -213,7 +223,7 @@ public class FullAnalysis extends AnAction {
      * @param problemsHolder    the ProblemsHolder containing the data clump problems
      * @param dataClumpProblems the list of data clump problems to add the new problems to
      */
-    private static void collectProblems(ProblemsHolder problemsHolder, List<DataClumpProblem> dataClumpProblems) {
+    private static void collectProblems(ProblemsHolder problemsHolder, List<DataClumpProblem> dataClumpProblems, VirtualFile file) {
 
         // iterate all problems in the ProblemsHolder
         if (problemsHolder.hasResults()) {
@@ -221,46 +231,51 @@ public class FullAnalysis extends AnAction {
                 String problemDescription = problem.getDescriptionTemplate();
 
                 // extract the names and properties from the description
-                Pattern pattern = Pattern.compile("Data Clump between (.*?) and (.*?)\\. Matching Properties \\[(.*?)\\]");
+                Pattern pattern = Pattern.compile("Data Clump between (.*?) (.*?) and (.*?) (.*?)\\. Matching Properties \\[(.*?)\\]");
                 Matcher matcher = pattern.matcher(problemDescription);
 
                 if (matcher.find()) {
-                    // extract the names
-                    String name1 = matcher.group(1);
-                    String name2 = matcher.group(2);
+                    String type1 = matcher.group(1);
+                    String name1 = matcher.group(2);
+                    String type2 = matcher.group(3);
+                    String name2 = matcher.group(4);
+                    String[] properties = matcher.group(5).split(",\\s*");
 
-                    // extract the properties
-                    String[] properties = matcher.group(3).split(",\\s*");
                     List<String> propertyList = Arrays.asList(properties);
 
-                    // create a new DataClumpProblem and add it to the list if it is not already contained
-                    DataClumpProblem dataClumpProblem = new DataClumpProblem(name1, name2, propertyList);
+                    // Create a new DataClumpProblem and add it to the list if it is not already contained
+
+                    HashSet<String> files = new HashSet<>();
+                    files.add(PsiUtil.runReadActionWithResult(file::getName));
+                    int lineNumber = PsiUtil.runReadActionWithResult(problem::getLineNumber) + 1;
+                    HashSet<Integer> lines = new HashSet<>();
+                    lines.add(lineNumber);
+                    DataClumpProblem dataClumpProblem = new DataClumpProblem(files, lines, name1, type1, name2, type2, propertyList);
+
                     if (!dataClumpProblems.contains(dataClumpProblem)) {
                         dataClumpProblems.add(dataClumpProblem);
+                    } else {
+                        int index = dataClumpProblems.indexOf(dataClumpProblem);
+                        dataClumpProblems.get(index).addFile(file.getName());
+                        dataClumpProblems.get(index).addLine(lineNumber);
                     }
+
                 }
             }
         }
 
     }
 
-    /**
-     * Writes the data clump problems to a JSON file.
-     *
-     * @param dataClumpProblems the list of data clump problems to write to the file
-     * @param resultPath        the path to save the results to
-     */
-    private static void writeToFile(List<DataClumpProblem> dataClumpProblems, VirtualFile file, String resultPath) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-        FilesProblem newProblem = new FilesProblem(file.getName(), dataClumpProblems);
+    private static void writeToFile(List<DataClumpProblem> problems, GeneralInformation info, String resultPath) {
+        Map<String, Object> jsonData = new HashMap<>();
+        jsonData.put("generalInfo", info);
+        jsonData.put("dataClumpProblems", problems);
 
-        try (FileWriter writer = new FileWriter(resultPath, true)) {
-            if (new File(resultPath).length() > 0) {
-                writer.write(",");
-            }
-            gson.toJson(newProblem, writer);
+        ObjectMapper objectMapper = new ObjectMapper();
 
+        try {
+            objectMapper.writeValue(new File(resultPath), jsonData);
         } catch (IOException e) {
             CodeSmellLogger.error("Could not write filepath: " + resultPath, e);
         }
@@ -269,7 +284,13 @@ public class FullAnalysis extends AnAction {
     /**
      * A record representing a data clump problem between two elements and the matching properties.
      */
-    private record DataClumpProblem(String element1, String element2, List<String> dataClump) {
+    private record DataClumpProblem(Set<String> files,
+                                    Set<Integer> lines,
+                                    String element1,
+                                    String type1,
+                                    String element2,
+                                    String type2,
+                                    List<String> dataClump) {
 
         @Override
         public boolean equals(Object obj) {
@@ -286,9 +307,22 @@ public class FullAnalysis extends AnAction {
                     (element1.equals(other.element2) && element2.equals(other.element1)))
                     && dataClump.equals(other.dataClump);
         }
+
+        public void addFile(String file) {
+            files.add(file);
+        }
+
+        public void addLine(int line) {
+            lines.add(line);
+        }
     }
 
-    private record FilesProblem(String file, List<DataClumpProblem> dataClumpProblems) {
+    /**
+     * A record representing the general information of the full analysis.
+     */
+    private record GeneralInformation(String project, String timeOfMeasurement, HashMap<String, String> settings,
+                                      int numberOfFiles, int numberOfDataClumps) {
     }
+
 
 }
