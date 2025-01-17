@@ -201,7 +201,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         // if the element is part of an interface, it can not be refactored
         // functions that are overridden can not be refactored since the overridden functions would be affected
         if (element instanceof TypeScriptFunction function) {
-            if (isOverritten(function)) return false;
+            if (isOverwritten(function)) return false;
             JSClass containingClass = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(element, JSClass.class));
             return !(containingClass instanceof TypeScriptInterface);
         } else return !(element instanceof TypeScriptInterface);
@@ -213,7 +213,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @param function the function
      * @return true if the function is overridden by another function, false otherwise
      */
-    private boolean isOverritten(TypeScriptFunction function) {
+    private boolean isOverwritten(TypeScriptFunction function) {
         List<JSClass> classesWithFunction = Index.getFunctionNamesToClasses().get(function.getName());
         if (classesWithFunction == null) return false;
         for (JSClass psiClass : classesWithFunction) {
@@ -234,9 +234,11 @@ public class DataClumpDetection extends LocalInspectionTool {
 
         HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
 
+        // iterate over the class fields of the current class
         for (Classfield classfield : Index.getClassesToClassFields().get(currentClass)) {
             if (!checkField(currentClass, classfield)) continue;
 
+            // iterate over the classes that have the same class field
             for (JSClass otherClass : new ArrayList<>(Index.getPropertiesToClasses().get(classfield))) {
 
                 if (!check(currentClass, otherClass)) continue;
@@ -244,7 +246,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 List<Classfield> classfieldList = Index.getClassesToClassFields().get(otherClass);
                 if (classfieldList.contains(classfield)) {
                     Classfield otherClassfield = classfieldList.get(classfieldList.indexOf(classfield));
-
+                    // make sure the fields match and are not only equal
                     if (!checkField(otherClass, otherClassfield) || !classfield.matches(otherClassfield)) continue;
 
                     if (!potentialDataClumps.containsKey(otherClass)) {
@@ -255,6 +257,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             }
 
             if (!Index.getPropertiesToFunctions().containsKey(classfield)) continue;
+            // iterate over the functions that have the same class field
             for (TypeScriptFunction otherFunction : new ArrayList<>(Index.getPropertiesToFunctions().get(classfield))) {
                 if (!check(currentClass, otherFunction)) continue;
                 if (!potentialDataClumps.containsKey(otherFunction)) {

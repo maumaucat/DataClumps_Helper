@@ -10,6 +10,7 @@ import util.Property;
 import util.PsiUtil;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -27,7 +28,7 @@ public class DiagnosticTool {
      */
     public static boolean DIAGNOSTIC_MODE = false;
     /**
-     * The path to the file where the measurements are stored.
+     * The paths to the files where the measurements are stored.
      */
     private static String FILE_PATH_DETECTION;
     private static String FILE_PATH_FULL_ANALYSIS;
@@ -54,33 +55,76 @@ public class DiagnosticTool {
         Index.addIndexBuildListener( () -> FullAnalysis.run(resultPath + "\\fullAnalysis_" + project.getName() + "_" + getCurrentDateTime() + ".json"));
     }
 
+    /**
+     * Adds a new measurement to the JSON file.
+     * @param newMeasurement the new measurement to be added
+     */
     public static void addMeasurement(DetectionMeasurement newMeasurement) {
         writeToFile(FILE_PATH_DETECTION, newMeasurement);
     }
 
+    /**
+     * Adds a new measurement to the JSON file.
+     * @param newMeasurement the new measurement to be added
+     */
     public static void addMeasurement(FullAnalysisMeasurement newMeasurement) {
         writeToFile(FILE_PATH_FULL_ANALYSIS, newMeasurement);
     }
 
+    /**
+     * Adds a new measurement to the JSON file.
+     * @param newMeasurement the new measurement to be added
+     */
     public static void addMeasurement(FullAnalysisFileMeasurement newMeasurement) {
         writeToFile(FILE_PATH_FULL_ANALYSIS, newMeasurement);
     }
 
+    /**
+     * Adds a new measurement to the JSON file.
+     * @param newMeasurement the new measurement to be added
+     */
     public static void addMeasurement(IndexMeasurement newMeasurement) {
         writeToFile(FILE_PATH_INDEX, newMeasurement);
     }
 
 
+    /**
+     * Writes the given measurement to the file at the given path.
+     *
+     * @param path the path to the file
+     * @param newMeasurement the measurement to be written to the file
+     * @param <T> the type of the mesurement
+     */
     public static <T> void writeToFile(String path, T newMeasurement) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         File file = new File(path);
-        try (FileWriter writer = new FileWriter(path, true)) {
-            if (file.exists() && file.length() > 0) {
-                writer.write(",");
-            }
-            gson.toJson(newMeasurement, writer);
+        JsonArray jsonArray;
 
+        try {
+            // if the file already exists, read the JSON-Array from it
+            if (file.exists() && file.length() > 0) {
+                try (FileReader reader = new FileReader(file)) {
+                    JsonElement jsonElement = JsonParser.parseReader(reader);
+                    // if the file is not an array, create a new one and add the existing element
+                    if (jsonElement.isJsonArray()) {
+                        jsonArray = jsonElement.getAsJsonArray();
+                    } else {
+                        jsonArray = new JsonArray();
+                        jsonArray.add(jsonElement);
+                    }
+                }
+            } else { // if the file does not exist, create a new JSON-Array
+                jsonArray = new JsonArray();
+            }
+
+            // add the new measurement to the JSON-Array
+            jsonArray.add(gson.toJsonTree(newMeasurement));
+
+            // write the JSON-Array back to the file
+            try (FileWriter writer = new FileWriter(file)) {
+                gson.toJson(jsonArray, writer);
+            }
         } catch (IOException e) {
             CodeSmellLogger.error("Could not write to file: " + path, e);
         }
@@ -98,6 +142,9 @@ public class DiagnosticTool {
         return now.format(formatter);
     }
 
+    /**
+     * Represents a detection measurement. (Time needed for the detection of a data clump)
+     */
     public static class DetectionMeasurement {
         String measurementType = "Detection";
         String project;
@@ -120,6 +167,9 @@ public class DiagnosticTool {
         }
     }
 
+    /**
+     * Represents a full analysis measurement. (Time needed for the full analysis of a project)
+     */
     public static class FullAnalysisMeasurement {
         String measurementType = "FullAnalysis";
         String project;
@@ -134,6 +184,9 @@ public class DiagnosticTool {
 
     }
 
+    /**
+     * Represents a full analysis file measurement. (Time needed for the full analysis of a single file)
+     */
     public static class FullAnalysisFileMeasurement {
         String measurementType = "FullAnalysisFile";
         String file;
@@ -148,6 +201,9 @@ public class DiagnosticTool {
 
     }
 
+    /**
+     * Represents an index measurement. (Time needed for the index build)
+     */
     public static class IndexMeasurement {
         String measurementType = "Index";
         String project;

@@ -39,7 +39,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.lang.Thread.sleep;
 
 /**
  * This class is an action that performs a full analysis of the project and saves the results in a JSON file.
@@ -71,9 +70,7 @@ public class FullAnalysis extends AnAction {
 
         // ensure that the Index is built before running the analysis
         String resultPath = dir.getPath() + "/full_analysis_" + Objects.requireNonNull(event.getProject()).getName() + ".json";
-        Index.addIndexBuildListener(() -> {
-            run(resultPath);
-        });
+        Index.addIndexBuildListener(() -> run(resultPath));
 
     }
 
@@ -95,6 +92,7 @@ public class FullAnalysis extends AnAction {
 
         Project project = Index.getProject();
 
+        // run the analysis in a background task, so the UI is not blocked
         ProgressManager.getInstance().run(new Task.Backgroundable(project, "Analyzing") {
 
             @Override
@@ -123,7 +121,7 @@ public class FullAnalysis extends AnAction {
 
                 // iterate all TypeScript files in the project
                 for (VirtualFile virtualFile : typescriptFiles) {
-                    Index.printSize();
+
                     long startTimeFile = 0;
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
                         startTimeFile = System.nanoTime();
@@ -190,13 +188,14 @@ public class FullAnalysis extends AnAction {
                     }
                 }
 
-                // general info
+                // general info about the analysis
                 HashMap<String, String> settings = new HashMap<>();
                 settings.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
                 settings.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
                 settings.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
 
 
+                // write all data clump problems and the general information to a JSON file
                 writeToFile(dataClumpProblems,
                         new GeneralInformation(
                                 project.getName(),
@@ -231,7 +230,7 @@ public class FullAnalysis extends AnAction {
                 String problemDescription = problem.getDescriptionTemplate();
 
                 // extract the names and properties from the description
-                Pattern pattern = Pattern.compile("Data Clump between (.*?) (.*?) and (.*?) (.*?)\\. Matching Properties \\[(.*?)\\]");
+                Pattern pattern = Pattern.compile("Data Clump between (.*?) (.*?) and (.*?) (.*?)\\. Matching Properties \\[(.*?)]");
                 Matcher matcher = pattern.matcher(problemDescription);
 
                 if (matcher.find()) {
@@ -266,7 +265,14 @@ public class FullAnalysis extends AnAction {
 
     }
 
-
+    /**
+     * Writes the data clump problems and the general information to a JSON file.
+     * The JSON file is saved at the given result path.
+     *
+     * @param problems   the list of data clump problems found in the analysis
+     * @param info       the general information of the analysis
+     * @param resultPath the path to save the results to
+     */
     private static void writeToFile(List<DataClumpProblem> problems, GeneralInformation info, String resultPath) {
         Map<String, Object> jsonData = new HashMap<>();
         jsonData.put("generalInfo", info);

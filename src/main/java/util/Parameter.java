@@ -19,16 +19,6 @@ public class Parameter extends Property {
         super(Objects.requireNonNull(PsiUtil.runReadActionWithResult(parameter::getName)), PsiUtil.runReadActionWithResult(parameter::getJSType));
     }
 
-    /**
-     * Creates a new instance of a parameter
-     *
-     * @param name The name of the parameter
-     * @param type The type of the parameter
-     */
-    public Parameter(String name, JSType type) {
-        super(name, type);
-    }
-
     @Override
     public String toString() {
         return this.name;

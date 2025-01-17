@@ -758,6 +758,13 @@ public class PsiUtil {
         return null;
     }
 
+    /**
+     * Returns the TypeScriptParameter from a function that corresponds to the given name.
+     *
+     * @param function The function in which the parameter should be found.
+     * @param name     The name of the parameter to be found.
+     * @return The TypeScriptParameter that corresponds to the given name. Null if the parameter is not found.
+     */
     public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, String name) {
 
         // make sure that underscore is not part of the name
@@ -806,7 +813,7 @@ public class PsiUtil {
         if (element instanceof TypeScriptFunction function) {
             String name = runReadActionWithResult(function::getQualifiedName);
             if (name != null) return name;
-        } else if(element instanceof TypeScriptClass clazz) {
+        } else if (element instanceof TypeScriptClass clazz) {
             String name = runReadActionWithResult(clazz::getQualifiedName);
             if (name != null) return name;
         } else if (element instanceof PsiQualifiedNamedElement) {
@@ -873,7 +880,7 @@ public class PsiUtil {
      * @return True if the parameter is defining a field, false otherwise.
      */
     public static boolean isParameterField(TypeScriptParameter parameter) {
-        return Objects.requireNonNull(runReadActionWithResult(()->PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class))).getTextLength() > 0;
+        return Objects.requireNonNull(runReadActionWithResult(() -> PsiTreeUtil.getChildOfType(parameter, JSAttributeList.class))).getTextLength() > 0;
     }
 
     /**
@@ -913,7 +920,7 @@ public class PsiUtil {
         }
         // check if the reference is a setter for a property (assuming getters are named the same as the property)
         if (definition instanceof TypeScriptFunction tsFunction && runReadActionWithResult(tsFunction::isSetProperty)) {
-            TypeScriptClass psiClass = runReadActionWithResult(()->PsiTreeUtil.getParentOfType(tsFunction, TypeScriptClass.class));
+            TypeScriptClass psiClass = runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(tsFunction, TypeScriptClass.class));
             if (psiClass != null) {
                 return getClassfield(psiClass, reference.getReferenceName());
             }
@@ -967,12 +974,23 @@ public class PsiUtil {
         return "./" + relativePathString.replace("\\", "/").substring(3, relativePathString.length() - 3);
     }
 
-
+    /**
+     * Runs the given action as a read action and returns the result.
+     *
+     * @param action the action to be run
+     * @param <T>    the type of the result
+     * @return the result of the action
+     */
     public static <T> T runReadActionWithResult(Supplier<T> action) {
         return ReadAction.compute(action::get);
     }
 
-
+    /**
+     * Runs the given action as a write action and returns the result.
+     *
+     * @param project the project in which the action should be run
+     * @param action  the action to be run
+     */
     public static <T> T runWriteCommandWithResult(Project project, Supplier<T> action) {
         return WriteCommandAction.writeCommandAction(project).compute(action::get);
     }
