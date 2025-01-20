@@ -112,8 +112,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
         } else if (otherElement instanceof TypeScriptFunction) {
             title = "Refactor Data Clump with " + ((TypeScriptFunction) otherElement).getQualifiedName();
         } else {
-            assert otherElement != null;
-            CodeSmellLogger.error("Invalid element type for dataclump.DataClumpRefactoring: " + otherElement.getClass(), new IllegalArgumentException());
             title = "Error refactor data clump " + PsiUtil.getName(otherElement);
         }
         return title;

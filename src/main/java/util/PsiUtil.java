@@ -237,7 +237,19 @@ public class PsiUtil {
 
         // Prepare the data structures
         List<Property> toBeAssignedFields = new ArrayList<>();
-        List<Classfield> classfields = getClassfields(psiClass);
+        // Get all classfields of the class not including the constructor parameters that are fields
+        // since they can be assigned in the constructor parameters and other classfields cannot be assigned in the constructor
+        // parameters since they cannot be assigned twice
+        List<Classfield> classfields = new ArrayList<>();
+        ApplicationManager.getApplication().runReadAction(() -> {
+            // iterate all FieldStatements
+            for (JSField field : psiClass.getFields()) {
+                if (!(field instanceof TypeScriptField) || field.getName() == null || field.getJSType() == null)
+                    continue;
+                classfields.add(new Classfield((TypeScriptField) field));
+            }
+
+        });
         List<Property> allProperties = new ArrayList<>(allFields);
         allProperties.addAll(allParameters);
 
@@ -294,6 +306,8 @@ public class PsiUtil {
 
             String propertyName = property.getName();
             String propertyType = property.getTypesAsString();
+
+            CodeSmellLogger.info("Classfields: " + classfields.toString());
 
             // If the property should be a field in the class and does not yet exist, define it in the constructor
             if (allFields.contains(property) && !classfields.contains(property)) {
