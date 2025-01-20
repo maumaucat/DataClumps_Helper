@@ -23,11 +23,14 @@ import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
+import evoluation.DiagnosticTool;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import util.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
@@ -128,6 +131,13 @@ public class DataClumpRefactoring implements LocalQuickFix {
     @Override
     public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor problemDescriptor) {
 
+        long startTime;
+        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+            startTime = System.nanoTime();
+        } else {
+            startTime = 0;
+        }
+
         // make sure that the refactoring is executed in the event dispatch thread to avoid issues with the UI and PSI
         ApplicationManager.getApplication().invokeLater(() -> {
             // show dialog to select properties
@@ -223,6 +233,11 @@ public class DataClumpRefactoring implements LocalQuickFix {
                 });
 
             });
+            if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                long endTime = System.nanoTime();
+                long duration = (endTime - startTime);
+                DiagnosticTool.addMeasurement(new DiagnosticTool.RefactoringMeasurement(project, this.currentElement.getElement(), this.otherElement.getElement(), matchingProperties, duration));
+            }
         });
 
     }
@@ -230,9 +245,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Creates a new class with the given name in the given directory and extracts the given properties as fields.
      *
-     * @param dir            the directory in which the class should be created
-     * @param className      the name of the class
-     * @param fields         the properties that should be extracted as fields
+     * @param dir       the directory in which the class should be created
+     * @param className the name of the class
+     * @param fields    the properties that should be extracted as fields
      * @return the created class
      */
     private TypeScriptClass extractClass(PsiDirectory dir, String className, List<Property> fields) {
@@ -376,7 +391,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * @param definingParameters the map to store the defining parameters
      * @param definedClassfields the map to store the defined classfields
      */
-    private void getClassfieldDefiningParameter(TypeScriptFunction function, HashMap<Parameter, Classfield> definingParameters, HashMap<Classfield, Parameter> definedClassfields)  {
+    private void getClassfieldDefiningParameter(TypeScriptFunction function, HashMap<Parameter, Classfield> definingParameters, HashMap<Classfield, Parameter> definedClassfields) {
 
         definedClassfields.clear();
         definingParameters.clear();
@@ -635,7 +650,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     if (reference.resolve() != psiField) continue;
                     // if it is assignment -> refactor to setter
                     JSAssignmentExpression assignmentExpression = PsiTreeUtil.getParentOfType(reference.getElement(), JSAssignmentExpression.class);
-                   if (assignmentExpression != null && Objects.requireNonNull(assignmentExpression.getLOperand()).getFirstChild() == reference) {
+                    if (assignmentExpression != null && Objects.requireNonNull(assignmentExpression.getLOperand()).getFirstChild() == reference) {
                         replaceAssignmentWithSetter(psiClass, assignmentExpression, fieldName, classfield.getName());
                     } else { // if no assignment refactor to getter
                         replaceReferenceWithGetter(psiClass, reference, fieldName, classfield.getName(), true);
@@ -693,7 +708,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
         JSExpressionStatement superCall = PsiUtil.getSuperCall(block);
         PsiElement insertPos;
         if (superCall != null) {
-           insertPos = superCall;
+            insertPos = superCall;
         } else {
             insertPos = block.getFirstChild();
         }
@@ -767,9 +782,9 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Refactors all calls of the given constructor to match the new function signature after new arguments where added.
      *
-     * @param constructor the constructor to refactor
+     * @param constructor        the constructor to refactor
      * @param originalParameters the original parameters of the constructor before the refactoring
-     * @param defaultValues the default values of the classfields of the class
+     * @param defaultValues      the default values of the classfields of the class
      */
     private void refactorConstructorCalls(TypeScriptFunction constructor, List<Property> originalParameters, HashMap<Classfield, String> defaultValues) {
         if (!constructor.isConstructor()) return;
@@ -1054,10 +1069,10 @@ public class DataClumpRefactoring implements LocalQuickFix {
     /**
      * Replaces the given reference with a getter call on the extracted class.
      *
-     * @param psiClass     the class that contains the data clump
-     * @param reference    the reference to replace
-     * @param fieldName    the name of the field that contains the extracted class
-     * @param propertyName the name of the property that is referenced
+     * @param psiClass         the class that contains the data clump
+     * @param reference        the reference to replace
+     * @param fieldName        the name of the field that contains the extracted class
+     * @param propertyName     the name of the property that is referenced
      * @param isFieldReference if the reference is a field reference
      */
     private void replaceReferenceWithGetter(TypeScriptClass psiClass, PsiReference reference, String fieldName, String propertyName, boolean isFieldReference) {
@@ -1172,7 +1187,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * The user is asked if the getter or setter can be used for the property.
      * If that's not the case, the class cannot be used for the refactoring.
      *
-     * @param psiClass the class to check
+     * @param psiClass  the class to check
      * @param dataClump the data clump to refactor
      * @return false if the class can be used for the refactoring in terms of getter and setter, true otherwise
      */
@@ -1188,7 +1203,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Checks if the given class has a conflicting setter for the given field.
      * If a setter for the field already exists, the user is asked if the setter can be used for the field.
      *
-     * @param psiClass the class to check
+     * @param psiClass  the class to check
      * @param fieldName the field to check
      * @return true if the class has a conflicting setter, false otherwise
      */
@@ -1202,18 +1217,22 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (setterName == null) continue;
 
             if (setterName.equals(fieldName)) {
-                int response = Messages.showYesNoDialog(
-                        psiFunction.getProject(),
-                        "<html><body>" +
-                                psiFunction.getText() + "<br><br>" +
-                                "</body></html>",
-                        "Can this function be used as a setter for the field </b> \"" + fieldName + "\"?",
-                        Messages.getQuestionIcon()
-                );
 
-                if (response == Messages.NO) {
+                AtomicInteger response = new AtomicInteger();
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    response.set(Messages.showYesNoDialog(
+                            psiFunction.getProject(),
+                            "<html><body>" +
+                                    psiFunction.getText() + "<br><br>" +
+                                    "</body></html>",
+                            "Can this function be used as a setter for the field </b> \"" + fieldName + "\"?",
+                            Messages.getQuestionIcon()
+                    ));
+                });
+                if (response.get() == Messages.NO) {
                     return true;
                 }
+
             }
         }
         return false;
@@ -1224,7 +1243,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
      * Checks if the given class has a conflicting getter for the given field.
      * If a getter for the field already exists, the user is asked if the getter can be used for the field.
      *
-     * @param psiClass the class to check
+     * @param psiClass  the class to check
      * @param fieldName the field to check
      * @return true if the class has a conflicting getter, false otherwise
      */
@@ -1238,19 +1257,21 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (getterName == null) continue;
 
             if (getterName.equals(fieldName)) {
-                int response = Messages.showYesNoDialog(
-                        psiFunction.getProject(),
-                        "<html><body>" +
-                                psiFunction.getText() + "<br><br>" +
-                                "</body></html>",
-                        "Can this function be used as a getter for the field </b> \"" + fieldName + "\"?",
-                        Messages.getQuestionIcon()
-                );
+                AtomicInteger response = new AtomicInteger();
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    response.set(Messages.showYesNoDialog(
+                            psiFunction.getProject(),
+                            "<html><body>" +
+                                    psiFunction.getText() + "<br><br>" +
+                                    "</body></html>",
+                            "Can this function be used as a getter for the field </b> \"" + fieldName + "\"?",
+                            Messages.getQuestionIcon()
+                    ));
 
-                if (response == Messages.NO) {
+                });
+                if (response.get() == Messages.NO) {
                     return true;
                 }
-
             }
         }
         return false;
@@ -1267,43 +1288,45 @@ public class DataClumpRefactoring implements LocalQuickFix {
         return false;
     }
 
-     private static class DefaultValues {
+    private static class DefaultValues {
         private static final String UNDEFINED = "undefined";
-         private static final String STRING = "\"\"";
-         private static final String NUMBER = "0";
-         private static final String BOOLEAN = "false";
-         private static final String ANY = "undefined";
+        private static final String STRING = "\"\"";
+        private static final String NUMBER = "0";
+        private static final String BOOLEAN = "false";
+        private static final String ANY = "undefined";
 
-         public static String getDefaultValue(Property property) {
-             for (String type : property.getTypes()) {
-                 switch (type) {
-                     case "string":
-                         return STRING;
-                     case "number":
-                         return NUMBER;
-                     case "boolean":
-                         return BOOLEAN;
-                     case "any":
-                         return ANY;
-                     case "undefined":
-                         return UNDEFINED;
-                     default:
-                         break;
-                 }
-             }
+        public static String getDefaultValue(Property property) {
+            for (String type : property.getTypes()) {
+                switch (type) {
+                    case "string":
+                        return STRING;
+                    case "number":
+                        return NUMBER;
+                    case "boolean":
+                        return BOOLEAN;
+                    case "any":
+                        return ANY;
+                    case "undefined":
+                        return UNDEFINED;
+                    default:
+                        break;
+                }
+            }
 
-             String input = null;
-             do {
-                 input = Messages.showInputDialog(
-                         "<html>Please enter a (default) initialization for <b>" + property.getName() +
-                                 " : " + property.getTypesAsString() + "</b>:<br></html>",
+            AtomicReference<String> input = new AtomicReference<>();
+            ApplicationManager.getApplication().invokeLater(() -> {
+                do {
+                    input.set(Messages.showInputDialog(
+                            "<html>Please enter a (default) initialization for <b>" + property.getName() +
+                                    " : " + property.getTypesAsString() + "</b>:<br></html>",
                             "",
-                         Messages.getQuestionIcon()
-                 );
-             } while (input == null || input.isEmpty());
-             return input;
+                            Messages.getQuestionIcon()
+                    ));
+                } while (input.get() == null || input.get().isEmpty());
+            });
+            return input.get();
 
-         }
+        }
     }
 
 

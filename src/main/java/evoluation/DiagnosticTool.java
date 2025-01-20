@@ -4,17 +4,27 @@ import com.google.gson.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import dataclump.FullAnalysis;
+import org.jetbrains.annotations.NotNull;
 import util.CodeSmellLogger;
 import util.Index;
 import util.Property;
 import util.PsiUtil;
 
+import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +43,7 @@ public class DiagnosticTool {
     private static String FILE_PATH_DETECTION;
     private static String FILE_PATH_FULL_ANALYSIS;
     private static String FILE_PATH_INDEX;
+    private static String FILE_PATH_REFACTORING;
 
 
     /**
@@ -51,12 +62,14 @@ public class DiagnosticTool {
         FILE_PATH_DETECTION = resultPath + "\\detectionMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_INDEX = resultPath + "\\indexMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_REFACTORING = resultPath + "\\refactoringMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
 
-        Index.addIndexBuildListener( () -> FullAnalysis.run(resultPath + "\\fullAnalysis_" + project.getName() + "_" + getCurrentDateTime() + ".json"));
+        Index.addIndexBuildListener(() -> FullAnalysis.run(resultPath + "\\fullAnalysis_" + project.getName() + "_" + getCurrentDateTime() + ".json"));
     }
 
     /**
      * Adds a new measurement to the JSON file.
+     *
      * @param newMeasurement the new measurement to be added
      */
     public static void addMeasurement(DetectionMeasurement newMeasurement) {
@@ -65,6 +78,7 @@ public class DiagnosticTool {
 
     /**
      * Adds a new measurement to the JSON file.
+     *
      * @param newMeasurement the new measurement to be added
      */
     public static void addMeasurement(FullAnalysisMeasurement newMeasurement) {
@@ -73,6 +87,7 @@ public class DiagnosticTool {
 
     /**
      * Adds a new measurement to the JSON file.
+     *
      * @param newMeasurement the new measurement to be added
      */
     public static void addMeasurement(FullAnalysisFileMeasurement newMeasurement) {
@@ -81,53 +96,60 @@ public class DiagnosticTool {
 
     /**
      * Adds a new measurement to the JSON file.
+     *
      * @param newMeasurement the new measurement to be added
      */
     public static void addMeasurement(IndexMeasurement newMeasurement) {
         writeToFile(FILE_PATH_INDEX, newMeasurement);
     }
 
+    /**
+     * Adds a new measurement to the JSON file.
+     *
+     * @param newMeasurement the new measurement to be added
+     */
+    public static void addMeasurement(RefactoringMeasurement newMeasurement) {
+        writeToFile(FILE_PATH_REFACTORING, newMeasurement);
+    }
 
     /**
      * Writes the given measurement to the file at the given path.
      *
-     * @param path the path to the file
+     * @param path           the path to the file
      * @param newMeasurement the measurement to be written to the file
-     * @param <T> the type of the mesurement
+     * @param <T>            the type of the mesurement
      */
-    public static <T> void writeToFile(String path, T newMeasurement) {
+    public synchronized static <T> void writeToFile(String path, @NotNull T newMeasurement) {
+
+        List<Object> data = null;
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-
+        // Read the existing data from the file if it exists
         File file = new File(path);
-        JsonArray jsonArray;
-
-        try {
-            // if the file already exists, read the JSON-Array from it
-            if (file.exists() && file.length() > 0) {
-                try (FileReader reader = new FileReader(file)) {
-                    JsonElement jsonElement = JsonParser.parseReader(reader);
-                    // if the file is not an array, create a new one and add the existing element
-                    if (jsonElement.isJsonArray()) {
-                        jsonArray = jsonElement.getAsJsonArray();
-                    } else {
-                        jsonArray = new JsonArray();
-                        jsonArray.add(jsonElement);
-                    }
-                }
-            } else { // if the file does not exist, create a new JSON-Array
-                jsonArray = new JsonArray();
+        if (file.exists() && file.length() > 0) {
+            try (FileReader reader = new FileReader(file)) {
+                Type listType = new TypeToken<List<Object>>() {
+                }.getType();
+                data = gson.fromJson(reader, listType);
+            } catch (IOException e) {
+                CodeSmellLogger.error("Error reading file: " + path, e);
             }
-
-            // add the new measurement to the JSON-Array
-            jsonArray.add(gson.toJsonTree(newMeasurement));
-
-            // write the JSON-Array back to the file
-            try (FileWriter writer = new FileWriter(file)) {
-                gson.toJson(jsonArray, writer);
-            }
-        } catch (IOException e) {
-            CodeSmellLogger.error("Could not write to file: " + path, e);
         }
+
+        // Create a new list if the file does not exist or is empty
+        if (data == null) {
+            data = new ArrayList<>();
+        }
+
+        // Add the new measurement to the list
+        data.add(newMeasurement);
+
+        // Write the list to the file
+        try (FileWriter writer = new FileWriter(file)) {
+            gson.toJson(data, writer);
+        } catch (IOException e) {
+            CodeSmellLogger.error("Error writing file: " + path, e);
+        }
+
     }
 
     /**
@@ -215,5 +237,31 @@ public class DiagnosticTool {
             this.timeOfMeasurement = getCurrentDateTime();
             this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
         }
+    }
+
+    /**
+     * Represents a refactoring measurement. (Time needed for the refactoring of a data clump)
+     */
+    public static class RefactoringMeasurement {
+        String measurementType = "Refactoring";
+        String project;
+        String timeOfMeasurement;
+        double durationInMilliSeconds;
+        String element1;
+        String element2;
+        List<String> dataClump;
+
+        public RefactoringMeasurement(Project project, PsiElement element1, PsiElement element2, List<Property> dataClump, long durationNanoSeconds) {
+            this.project = project.getName();
+            this.timeOfMeasurement = getCurrentDateTime();
+            this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
+            this.element1 = PsiUtil.getQualifiedName(element1);
+            this.element2 = PsiUtil.getQualifiedName(element2);
+            this.dataClump = new ArrayList<>();
+            for (Property property : dataClump) {
+                this.dataClump.add(property.toString());
+            }
+        }
+
     }
 }

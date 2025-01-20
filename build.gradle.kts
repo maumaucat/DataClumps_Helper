@@ -173,8 +173,9 @@ intellijPlatformTesting {
     }
 }
 
-
-
+tasks.withType<Copy>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
 
 // only works on 2024.2 not 2024.3
 tasks {
@@ -188,7 +189,7 @@ tasks {
         println("Result: $resultPath")
 
         jvmArgs = listOf(
-            "-Djava.awt.headless=true",
+            "-Djava.awt.headless=false",
             "-Ddataclump.diagnostic.tool=true",
             "-Ddataclump.projectpath=$projectPath",
             "-Ddataclump.resultpath=$resultPath",
