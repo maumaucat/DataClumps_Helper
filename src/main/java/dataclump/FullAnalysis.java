@@ -2,15 +2,16 @@ package dataclump;
 
 import Settings.DataClumpSettings;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.intellij.codeInspection.ProblemDescriptor;
+import com.intellij.codeInspection.InspectionManager;
 import com.intellij.codeInspection.ProblemsHolder;
+import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.lang.javascript.TypeScriptFileType;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptClass;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
-import com.intellij.lang.javascript.psi.ecma6.TypeScriptInterface;
+import com.intellij.lang.javascript.psi.ecma6.*;
+import com.intellij.lang.javascript.psi.ecmal4.JSClass;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
@@ -28,16 +29,13 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import evoluation.DiagnosticTool;
 import org.jetbrains.annotations.NotNull;
-import util.CodeSmellLogger;
-import util.DataClumpUtil;
-import util.Index;
-import util.PsiUtil;
+import util.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static evoluation.DiagnosticTool.getCurrentDateTime;
 
 
 /**
@@ -46,6 +44,16 @@ import java.util.regex.Pattern;
  * matching properties in the JSON file.
  */
 public class FullAnalysis extends AnAction {
+
+    private static HashMap<String, ReportFormat.DataClumpTypeContext> dataClumps = new HashMap<>();
+    private static int amountDataClumps = 0;
+    private static int fieldsToFieldsDataClump = 0;
+    private static int parametersToFieldsDataClump = 0;
+    private static int parametersToParametersDataClump = 0;
+    private static Set<PsiFile> filesWithDataClumps = new HashSet<>();
+    private static Set<PsiElement> classesOrInterfacesWithDataClumps = new HashSet<>();
+    private static Set<PsiElement> methodsWithDataClumps = new HashSet<>();
+
 
     /**
      * Called when the action is performed. It opens a file chooser dialog and lets the user choose a
@@ -113,22 +121,30 @@ public class FullAnalysis extends AnAction {
                     typescriptFiles.addAll(FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)));
                 });
 
-                int numberOfFiles = typescriptFiles.size();
+                // initialize variables to store the counting information for the report
+                dataClumps = new HashMap<>();
+                amountDataClumps = 0;
+                fieldsToFieldsDataClump = 0;
+                parametersToFieldsDataClump = 0;
+                parametersToParametersDataClump = 0;
+                int numberOfClassesOrInterfaces = 0;
+                int numberOfMethods = 0;
+                int numberOfDataFields = 0;
+                int numberOfMethodParameters = 0;
+
+                // initialize the count for the file iteration (so the progress can be logged)
                 int count = 1;
 
-                // all data clump problems
-                List<DataClumpProblem> dataClumpProblems = new ArrayList<>();
+                DataClumpDetection inspection = new DataClumpDetection();
 
                 // iterate all TypeScript files in the project
                 for (VirtualFile virtualFile : typescriptFiles) {
+                    CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + "(" + count + "/" + typescriptFiles.size() + ")");
 
                     long startTimeFile = 0;
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
                         startTimeFile = System.nanoTime();
                     }
-
-                    CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + " (" + count + "/" + numberOfFiles + ")"
-                            + " - " + virtualFile.getLength());
 
                     // read the psiFile in a read action
                     final PsiFile[] psiFileWrap = new PsiFile[1]; // Using an array to make it effectively final
@@ -143,11 +159,25 @@ public class FullAnalysis extends AnAction {
                         functions.addAll(PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class));
                     });
 
+
                     // iterate all functions in the file and collect the data clump problems
                     for (TypeScriptFunction psiElement : functions) {
-                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                        assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
+                        numberOfMethods++;
+                        if (!PsiUtil.runReadActionWithResult(psiElement::isValid))
+                            CodeSmellLogger.error("Invalid Function: " + psiElement, new Exception());
+                        // Skip constructors
+                        if (PsiUtil.runReadActionWithResult(psiElement::isConstructor)) continue;
+
+                        // Detect data clumps if the number of parameters is greater than the required minimum
+                        List<Parameter> parameters = Index.getFunctionsToParameters().get(psiElement);
+                        numberOfMethodParameters += parameters != null ? parameters.size() : 0;
+                        if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                            inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                    InspectionManager.getInstance(project),
+                                    psiFile,
+                                    false
+                            ), true);
+                        }
                     }
 
                     // collect all classes in the file in a read action
@@ -160,9 +190,17 @@ public class FullAnalysis extends AnAction {
 
                     // iterate all classes in the file and collect the data clump problems
                     for (PsiElement psiElement : allClasses) {
-                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                        assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
+                        numberOfClassesOrInterfaces++;
+                        List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
+                        numberOfDataFields += classfields != null ? classfields.size() : 0;
+                        if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                            inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                    InspectionManager.getInstance(project),
+                                    psiFile,
+                                    false
+                            ), true);
+                        }
+
                     }
 
                     // collect all interfaces in the file in a read action
@@ -175,12 +213,20 @@ public class FullAnalysis extends AnAction {
 
                     // iterate all interfaces in the file and collect the data clump problems
                     for (PsiElement psiElement : allInterfaces) {
-                        ProblemsHolder problemsHolder = DataClumpUtil.invokeInspection(psiElement);
-                        assert problemsHolder != null;
-                        collectProblems(problemsHolder, dataClumpProblems, virtualFile);
+                        numberOfClassesOrInterfaces++;
+                        List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
+                        numberOfDataFields += classfields != null ? classfields.size() : 0;
+                        if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                            inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                    InspectionManager.getInstance(project),
+                                    psiFile,
+                                    false
+                            ), true);
+                        }
                     }
 
                     count++;
+
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
                         long endTimeFile = System.nanoTime();
                         long durationFile = (endTimeFile - startTimeFile);
@@ -188,22 +234,62 @@ public class FullAnalysis extends AnAction {
                     }
                 }
 
-                // general info about the analysis
-                HashMap<String, String> settings = new HashMap<>();
-                settings.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
-                settings.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
-                settings.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
+                // information about the settings
+                HashMap<String, String> options = new HashMap<>();
+                options.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
+                options.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
+                options.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
 
+                // information about the detector (this Plugin)
+                ReportFormat.DataClumpsDetectorContext detector = new ReportFormat.DataClumpsDetectorContext(
+                        "Data Clump Helper",
+                        null,
+                        Objects.requireNonNull(PluginManagerCore.getPlugin(PluginId.getId("de.marlena.data.clump.helper"))).getVersion(),
+                        options
+                );
 
-                // write all data clump problems and the general information to a JSON file
-                writeToFile(dataClumpProblems,
-                        new GeneralInformation(
-                                project.getName(),
-                                DiagnosticTool.getCurrentDateTime(),
-                                settings,
-                                numberOfFiles,
-                                dataClumpProblems.size())
-                        , resultPath);
+                // summary information for the report (amount of data clumps, files, classes, methods, and fields etc)
+                ReportFormat.ReportSummary summary = new ReportFormat.ReportSummary(
+                        amountDataClumps,
+                        filesWithDataClumps.size(),
+                        classesOrInterfacesWithDataClumps.size(),
+                        methodsWithDataClumps.size(),
+                        fieldsToFieldsDataClump,
+                        parametersToFieldsDataClump,
+                        parametersToParametersDataClump,
+                        ""
+                );
+
+                // information about the project
+                ReportFormat.ProjectInfo projectInfo = new ReportFormat.ProjectInfo(
+                        null,
+                        project.getName(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        typescriptFiles.size(),
+                        numberOfClassesOrInterfaces,
+                        numberOfMethods,
+                        numberOfDataFields,
+                        numberOfMethodParameters,
+                        ""
+                );
+
+                // create the context for the report
+                ReportFormat.DataClumpsTypeContext context = new ReportFormat.DataClumpsTypeContext(
+                        "1.0",
+                        detector,
+                        dataClumps,
+                        getCurrentDateTime(),
+                        "TypeScript",
+                        summary,
+                        projectInfo
+                );
+
+                // write the context to the file
+                writeToFile(context, resultPath);
+                CodeSmellLogger.info("Full analysis completed");
 
                 if (DiagnosticTool.DIAGNOSTIC_MODE) {
                     long endTime = System.nanoTime();
@@ -214,121 +300,52 @@ public class FullAnalysis extends AnAction {
         });
     }
 
-
     /**
-     * Collects the data clump problems from the ProblemsHolder and adds them to the list of data clump problems.
-     * The data clump problems are extracted from the description of the ProblemDescriptors.
+     * Reports a data clump between two elements and the variables that are clumped. The data clump is stored in the
+     * dataClumps map and the elements are stored in the corresponding sets. This method is called by the inspection if it
+     * is invoked by the full analysis.
      *
-     * @param problemsHolder    the ProblemsHolder containing the data clump problems
-     * @param dataClumpProblems the list of data clump problems to add the new problems to
+     * @param fromElement the element from where the data clump is detected
+     * @param toElement the element with whom the data clump is detected
+     * @param variables the variables that are clumped (fields or parameters)
      */
-    private static void collectProblems(ProblemsHolder problemsHolder, List<DataClumpProblem> dataClumpProblems, VirtualFile file) {
+    public static void report(PsiElement fromElement, PsiElement toElement, List<Property> variables) {
+        amountDataClumps++;
 
-        // iterate all problems in the ProblemsHolder
-        if (problemsHolder.hasResults()) {
-            for (ProblemDescriptor problem : problemsHolder.getResults()) {
-                String problemDescription = problem.getDescriptionTemplate();
-
-                // extract the names and properties from the description
-                Pattern pattern = Pattern.compile("Data Clump between (.*?) (.*?) and (.*?) (.*?)\\. Matching Properties \\[(.*?)]");
-                Matcher matcher = pattern.matcher(problemDescription);
-
-                if (matcher.find()) {
-                    String type1 = matcher.group(1);
-                    String name1 = matcher.group(2);
-                    String type2 = matcher.group(3);
-                    String name2 = matcher.group(4);
-                    String[] properties = matcher.group(5).split(",\\s*");
-
-                    List<String> propertyList = Arrays.asList(properties);
-
-                    // Create a new DataClumpProblem and add it to the list if it is not already contained
-
-                    HashSet<String> files = new HashSet<>();
-                    files.add(PsiUtil.runReadActionWithResult(file::getName));
-                    int lineNumber = PsiUtil.runReadActionWithResult(problem::getLineNumber) + 1;
-                    HashSet<Integer> lines = new HashSet<>();
-                    lines.add(lineNumber);
-                    DataClumpProblem dataClumpProblem = new DataClumpProblem(files, lines, name1, type1, name2, type2, propertyList);
-
-                    if (!dataClumpProblems.contains(dataClumpProblem)) {
-                        dataClumpProblems.add(dataClumpProblem);
-                    } else {
-                        int index = dataClumpProblems.indexOf(dataClumpProblem);
-                        dataClumpProblems.get(index).addFile(file.getName());
-                        dataClumpProblems.get(index).addLine(lineNumber);
-                    }
-
-                }
-            }
+        if (fromElement instanceof JSClass) {
+            classesOrInterfacesWithDataClumps.add(fromElement);
+        } else {
+            methodsWithDataClumps.add(fromElement);
         }
 
+        filesWithDataClumps.add(fromElement.getContainingFile());
+        filesWithDataClumps.add(toElement.getContainingFile());
+
+        ReportFormat.DataClumpTypeContext dataClumpTypeContext = ReportFormat.getDataClumpsTypeContext(fromElement, toElement, variables);
+
+        if (dataClumpTypeContext.dataClumpType().equals("parameters_to_parameters")) {
+            parametersToParametersDataClump++;
+        } else if (dataClumpTypeContext.dataClumpType().equals("parameters_to_fields")) {
+            parametersToFieldsDataClump++;
+        } else {
+            fieldsToFieldsDataClump++;
+        }
+
+        FullAnalysis.dataClumps.put(dataClumpTypeContext.key(), dataClumpTypeContext);
     }
 
     /**
-     * Writes the data clump problems and the general information to a JSON file.
-     * The JSON file is saved at the given result path.
+     * Writes the context to a JSON file.
      *
-     * @param problems   the list of data clump problems found in the analysis
-     * @param info       the general information of the analysis
-     * @param resultPath the path to save the results to
+     * @param context the context to write to the file
+     * @param resultPath the path to write the file to
      */
-    private static void writeToFile(List<DataClumpProblem> problems, GeneralInformation info, String resultPath) {
-        Map<String, Object> jsonData = new HashMap<>();
-        jsonData.put("generalInfo", info);
-        jsonData.put("dataClumpProblems", problems);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-
+    private static void writeToFile(ReportFormat.DataClumpsTypeContext context, String resultPath) {
+        ObjectMapper mapper = new ObjectMapper();
         try {
-            objectMapper.writeValue(new File(resultPath), jsonData);
+            mapper.writeValue(new File(resultPath), context);
         } catch (IOException e) {
-            CodeSmellLogger.error("Could not write filepath: " + resultPath, e);
+            CodeSmellLogger.error("Error writing to file", e);
         }
     }
-
-    /**
-     * A record representing a data clump problem between two elements and the matching properties.
-     */
-    private record DataClumpProblem(Set<String> files,
-                                    Set<Integer> lines,
-                                    String element1,
-                                    String type1,
-                                    String element2,
-                                    String type2,
-                                    List<String> dataClump) {
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null || getClass() != obj.getClass()) {
-                return false;
-            }
-            // a DataClumpProblem is equal to another if the elements and the data clump are equal
-            // regardless of the order of the elements and the properties are equal
-            DataClumpProblem other = (DataClumpProblem) obj;
-            return ((element1.equals(other.element1) && element2.equals(other.element2)) ||
-                    (element1.equals(other.element2) && element2.equals(other.element1)))
-                    && dataClump.equals(other.dataClump);
-        }
-
-        public void addFile(String file) {
-            files.add(file);
-        }
-
-        public void addLine(int line) {
-            lines.add(line);
-        }
-    }
-
-    /**
-     * A record representing the general information of the full analysis.
-     */
-    private record GeneralInformation(String project, String timeOfMeasurement, HashMap<String, String> settings,
-                                      int numberOfFiles, int numberOfDataClumps) {
-    }
-
-
 }

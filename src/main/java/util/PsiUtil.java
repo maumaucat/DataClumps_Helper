@@ -600,6 +600,36 @@ public class PsiUtil {
     }
 
     /**
+     * Returns all Modifiers of a parameter that is defining a field as a list of strings.
+     * The visibility of the parameter is included in the modifiers.
+     *
+     * @param field The field of which the modifiers should be returned.
+     * @return The modifiers of the field as a list of strings including the visibility.
+     */
+    public static List<String> getModifiersIncludingVisibility(TypeScriptField field) {
+
+        List<String> modifiers = getModifiers(field);
+        modifiers.add(runReadActionWithResult(() -> field.getAccessType().toString().toLowerCase()));
+
+        return modifiers;
+    }
+
+    /**
+     * Returns all Modifiers of a parameter that is defining a field as a list of strings.
+     * The visibility of the parameter is included in the modifiers.
+     *
+     * @param parameter The parameter of which the modifiers should be returned.
+     * @return The modifiers of the parameter as a list of strings including the visibility.
+     */
+    public static List<String> getModifiersIncludingVisibility(TypeScriptParameter parameter) {
+
+        List<String> modifiers = getModifiers(parameter);
+        modifiers.add(runReadActionWithResult(() -> parameter.getAccessType().toString().toLowerCase()));
+
+        return modifiers;
+    }
+
+    /**
      * Returns given a parameter all classfields that that parameter is assigned to.
      *
      * @param parameter The parameter for which the assigned fields should be returned.

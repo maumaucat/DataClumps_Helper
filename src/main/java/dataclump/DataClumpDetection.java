@@ -57,7 +57,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 // Detect data clumps if the number of parameters is greater than the required minimum
                 List<Parameter> parameters = Index.getFunctionsToParameters().get(psiFunction);
                 if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                    detectDataClump(psiFunction, holder);
+                    detectDataClump(psiFunction, holder, false);
                 }
                 super.visitJSParameterList(parameterList);
             }
@@ -76,7 +76,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 // Detect data clumps if the number of properties is greater than the required minimum
                 List<Classfield> classfields = Index.getClassesToClassFields().get(TypeScriptClass);
                 if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                    detectDataClump(TypeScriptClass, holder);
+                    detectDataClump(TypeScriptClass, holder, false);
                 }
                 super.visitTypeScriptClass(TypeScriptClass);
             }
@@ -92,8 +92,9 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                 Index.updateClass(typeScriptInterface);
 
-                if (PsiUtil.getClassfields(typeScriptInterface).size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                    detectDataClump(typeScriptInterface, holder);
+                List<Classfield> classfields = Index.getClassesToClassFields().get(typeScriptInterface);
+                if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                    detectDataClump(typeScriptInterface, holder, false);
                 }
                 super.visitTypeScriptInterface(typeScriptInterface);
             }
@@ -105,8 +106,9 @@ public class DataClumpDetection extends LocalInspectionTool {
      *
      * @param currentElement the current element
      * @param holder         the problems holder
+     * @param report         if the data clumps should be reported to the full analysis
      */
-    public void detectDataClump(PsiElement currentElement, ProblemsHolder holder) {
+    public void detectDataClump(PsiElement currentElement, ProblemsHolder holder, boolean report) {
 
         long start = 0;
         if (DiagnosticTool.DIAGNOSTIC_MODE) {
@@ -121,7 +123,7 @@ public class DataClumpDetection extends LocalInspectionTool {
             potentialDataClumps = calculatePotentialDataClumpsForFunction(currentFunction);
         }
 
-        processPotentialDataClumps(potentialDataClumps, holder, currentElement, start);
+        processPotentialDataClumps(potentialDataClumps, holder, currentElement, start, report);
     }
 
     /**
@@ -130,8 +132,10 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @param potentialDataClumps the potential data clumps
      * @param holder              the problems holder
      * @param currentElement      the current element
+     * @param start               the start time of the detection
+     * @param report              if the data clumps should be reported to the full analysis
      */
-    private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement, long start) {
+    private void processPotentialDataClumps(HashMap<PsiElement, List<Property>> potentialDataClumps, ProblemsHolder holder, PsiElement currentElement, long start, boolean report) {
 
         List<Property> currentElementsProperties = new ArrayList<>();
 
@@ -145,6 +149,12 @@ public class DataClumpDetection extends LocalInspectionTool {
             List<Property> matchingProperties = potentialDataClumps.get(otherElement);
             // Check if the number of matching properties is greater than the required minimum
             if (matchingProperties.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+
+                // report the data clump to the full analysis if required
+                if (report) {
+                    FullAnalysis.report(currentElement, otherElement, matchingProperties);
+                    return;
+                }
 
                 // mark the data clump as a problem
                 for (Property property : currentElementsProperties) {
@@ -177,14 +187,14 @@ public class DataClumpDetection extends LocalInspectionTool {
                             );
                         }
 
-                        if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                            long end = System.nanoTime();
-                            long time = end - start;
-                            DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), currentElement, otherElement, matchingProperties, time));
-                        }
-
                     }
                 }
+            }
+
+            if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                long end = System.nanoTime();
+                long time = end - start;
+                DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), currentElement, otherElement, matchingProperties, time));
             }
         }
 

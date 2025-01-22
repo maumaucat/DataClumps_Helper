@@ -1,6 +1,6 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>de.marlena.plugin</id>
+    <id>de.marlena.data.clump.helper</id>
     <name>DataClumpHelper</name>
     <vendor>Marlena Schmidt</vendor>
 
