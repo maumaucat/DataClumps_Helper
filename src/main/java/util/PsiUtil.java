@@ -278,7 +278,10 @@ public class PsiUtil {
 
         assert wrapper != null;
 
-        return (TypeScriptFunction) wrapper.getConstructor();
+        return runReadActionWithResult(() -> wrapper.getConstructors()[0]);
+
+
+
     }
 
     /**
@@ -424,6 +427,7 @@ public class PsiUtil {
         // Insert the field
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             psiClass.addBefore(field, insertBefore);
+            PsiDocumentManager.getInstance(psiClass.getProject()).commitAllDocuments();
         });
 
     }
@@ -445,6 +449,7 @@ public class PsiUtil {
             } else {
                 psiClass.addBefore(function, psiClass.getLastChild());
             }
+            PsiDocumentManager.getInstance(psiClass.getProject()).commitAllDocuments();
         });
     }
 
@@ -469,6 +474,7 @@ public class PsiUtil {
         JSParameterList newParameterList = createJSParameterList(parameterList, parameters);
         WriteCommandAction.runWriteCommandAction(parameterList.getProject(), () -> {
             parameterList.replace(newParameterList);
+            PsiDocumentManager.getInstance(parameterList.getProject()).commitAllDocuments();
         });
     }
 
@@ -487,7 +493,8 @@ public class PsiUtil {
                 true
         );
 
-        ApplicationManager.getApplication().runWriteAction(renameProcessor::run);
+        ApplicationManager.getApplication().runWriteAction(renameProcessor);
+        PsiDocumentManager.getInstance(element.getProject()).commitAllDocuments();
     }
 
     /**
@@ -514,6 +521,7 @@ public class PsiUtil {
 
         WriteCommandAction.runWriteCommandAction(psiClass.getProject(), () -> {
             psiClass.replace(newClass);
+            PsiDocumentManager.getInstance(psiClass.getProject()).commitAllDocuments();
         });
 
         // this is necessary to get the virtual file later on

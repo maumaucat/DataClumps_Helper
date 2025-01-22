@@ -44,8 +44,12 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitJSParameterList(@NotNull JSParameterList parameterList) {
+                CodeSmellLogger.info("Visiting Parameter List: " + parameterList.getText());
+                CodeSmellLogger.info("Visiting Parameter List: valid " + parameterList.isValid());
 
                 TypeScriptFunction psiFunction = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(parameterList, TypeScriptFunction.class));
+                CodeSmellLogger.info("Visiting Parameter List: Function " + psiFunction);
+                CodeSmellLogger.info("Visiting Parameter List: Function valid " + psiFunction.isValid());
                 assert psiFunction != null;
                 if (!PsiUtil.runReadActionWithResult(psiFunction::isValid))
                     CodeSmellLogger.error("Invalid Function: " + psiFunction, new Exception());
@@ -70,6 +74,8 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitTypeScriptClass(@NotNull TypeScriptClass TypeScriptClass) {
+                CodeSmellLogger.info("Visiting Class: " + TypeScriptClass.getName());
+                CodeSmellLogger.info("Visiting Class: valid " + TypeScriptClass.isValid());
 
                 // Update the index
                 Index.updateClass(TypeScriptClass);
@@ -89,6 +95,8 @@ public class DataClumpDetection extends LocalInspectionTool {
              */
             @Override
             public void visitTypeScriptInterface(@NotNull TypeScriptInterface typeScriptInterface) {
+                CodeSmellLogger.info("Visiting Interface: " + typeScriptInterface.getName());
+                CodeSmellLogger.info("Visiting Interface: valid " + typeScriptInterface.isValid());
 
                 Index.updateClass(typeScriptInterface);
 
