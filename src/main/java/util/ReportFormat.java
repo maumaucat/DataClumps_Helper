@@ -32,9 +32,9 @@ public class ReportFormat {
     public static DataClumpTypeContext getDataClumpsTypeContext(PsiElement fromElement, PsiElement toElement, List<Property> variables) {
 
         // get the containing files of the two elements and the project for the PsiDocumentManager later
-        PsiFile fromContainingFile = fromElement.getContainingFile();
-        PsiFile toContainingFile = toElement.getContainingFile();
-        Project project = fromElement.getProject();
+        PsiFile fromContainingFile = PsiUtil.runReadActionWithResult(fromElement::getContainingFile);
+        PsiFile toContainingFile = PsiUtil.runReadActionWithResult(toElement::getContainingFile);
+        Project project = PsiUtil.runReadActionWithResult(fromElement::getProject);
 
         // for each variable create a context for the from and to file and add it to the dataClumpsVariables map
         Map<String, ReportFormat.DataClumpsVariableFromContext> dataClumpsVariables = new HashMap<>();
@@ -59,30 +59,34 @@ public class ReportFormat {
 
             // get the document of the two files and use it to get the position of the PsiElements
             PsiDocumentManager psiDocumentManager = PsiDocumentManager.getInstance(project);
-            Document fromDocument = psiDocumentManager.getDocument(fromContainingFile);
-            Document toDocument = psiDocumentManager.getDocument(toContainingFile);
+            Document fromDocument = PsiUtil.runReadActionWithResult(() -> psiDocumentManager.getDocument(fromContainingFile));
+            Document toDocument = PsiUtil.runReadActionWithResult(() -> psiDocumentManager.getDocument(toContainingFile));
             assert fromDocument != null;
             assert toDocument != null;
 
 
-            int startLine = fromDocument.getLineNumber(fromVariable.getTextRange().getStartOffset());
-            int endLine = fromDocument.getLineNumber(fromVariable.getTextRange().getEndOffset());
+            final int formStartLine = PsiUtil.runReadActionWithResult(() -> fromDocument.getLineNumber(fromVariable.getTextRange().getStartOffset()));
+            final int fromEndLine = PsiUtil.runReadActionWithResult(() -> fromDocument.getLineNumber(fromVariable.getTextRange().getEndOffset()));
 
             ReportFormat.Position fromPosition = new ReportFormat.Position(
-                    startLine + 1,
-                    fromVariable.getTextRange().getStartOffset() - fromDocument.getLineStartOffset(startLine),
-                    endLine + 1,
-                    fromVariable.getTextRange().getEndOffset() - fromDocument.getLineStartOffset(endLine)
+                    formStartLine + 1,
+                    PsiUtil.runReadActionWithResult(() -> fromVariable.getTextRange().getStartOffset()) -
+                            PsiUtil.runReadActionWithResult(() -> fromDocument.getLineStartOffset(formStartLine)),
+                    fromEndLine + 1,
+                    PsiUtil.runReadActionWithResult(() -> fromVariable.getTextRange().getEndOffset()) -
+                            PsiUtil.runReadActionWithResult(() -> fromDocument.getLineStartOffset(fromEndLine))
             );
 
-            startLine = toDocument.getLineNumber(toVariable.getTextRange().getStartOffset());
-            endLine = toDocument.getLineNumber(toVariable.getTextRange().getEndOffset());
+            final int toStartLine = PsiUtil.runReadActionWithResult(() -> toDocument.getLineNumber(toVariable.getTextRange().getStartOffset()));
+            final int toEndLine = PsiUtil.runReadActionWithResult(() -> toDocument.getLineNumber(toVariable.getTextRange().getEndOffset()));
 
             ReportFormat.Position toPosition = new ReportFormat.Position(
-                    startLine + 1,
-                    toVariable.getTextRange().getStartOffset() - toDocument.getLineStartOffset(startLine),
-                    endLine + 1,
-                    toVariable.getTextRange().getEndOffset() - toDocument.getLineStartOffset(endLine)
+                    toStartLine + 1,
+                    PsiUtil.runReadActionWithResult(() -> toVariable.getTextRange().getStartOffset()) -
+                            PsiUtil.runReadActionWithResult(() -> toDocument.getLineStartOffset(toStartLine)),
+                    toEndLine + 1,
+                    PsiUtil.runReadActionWithResult(() -> toVariable.getTextRange().getEndOffset()) -
+                            PsiUtil.runReadActionWithResult(() -> toDocument.getLineStartOffset(toEndLine))
             );
 
             // get the modifiers of the two variables including the visibility
@@ -135,16 +139,17 @@ public class ReportFormat {
         }
 
         // create the context for the data clump
-        ReportFormat.DataClumpTypeContext dataClumpTypeContext = new ReportFormat.DataClumpTypeContext(
+
+        return new DataClumpTypeContext(
                 "data_clump",
                 PsiUtil.getQualifiedName(fromElement) + "-" + PsiUtil.getQualifiedName(toElement),
                 1.0,
-                fromElement.getContainingFile().getVirtualFile().getPath(),
+                PsiUtil.runReadActionWithResult(() -> fromElement.getContainingFile().getVirtualFile().getPath()),
                 fromElement instanceof JSClass ? PsiUtil.getName(fromElement) : null,
                 fromElement instanceof JSClass ? PsiUtil.getQualifiedName(fromElement) : null,
                 fromElement instanceof TypeScriptFunction ? PsiUtil.getName(fromElement) : null,
                 fromElement instanceof TypeScriptFunction ? PsiUtil.getQualifiedName(fromElement) : null,
-                toElement.getContainingFile().getVirtualFile().getPath(),
+                PsiUtil.runReadActionWithResult(() -> toElement.getContainingFile().getVirtualFile().getPath()),
                 toElement instanceof JSClass ? PsiUtil.getName(toElement) : null,
                 toElement instanceof JSClass ? PsiUtil.getQualifiedName(toElement) : null,
                 toElement instanceof TypeScriptFunction ? PsiUtil.getName(toElement) : null,
@@ -153,21 +158,19 @@ public class ReportFormat {
                 dataClumpsVariables
         );
 
-        return dataClumpTypeContext;
-
     }
 
     /**
      * This type encapsulates the context of multiple data clumps. It includes the report's version,
      * the options used during the data clump analysis, and a dictionary mapping keys to data clump contexts.
      *
-     * @param reportVersion the version of the context format or the tooling.
-     * @param detector the options used during the data clump analysis.
-     * @param dataClumps a dictionary mapping keys to data clump contexts.
+     * @param reportVersion   the version of the context format or the tooling.
+     * @param detector        the options used during the data clump analysis.
+     * @param dataClumps      a dictionary mapping keys to data clump contexts.
      * @param reportTimestamp the timestamp when the report was created.
-     * @param targetLanguage the language or framework the detector designed for.
-     * @param reportSummary an overall summary of the report
-     * @param projectInfo information about the project or codebase the report was generated for.
+     * @param targetLanguage  the language or framework the detector designed for.
+     * @param reportSummary   an overall summary of the report
+     * @param projectInfo     information about the project or codebase the report was generated for.
      */
     public record DataClumpsTypeContext(@SerializedName("report_version") String reportVersion,
                                         DataClumpsDetectorContext detector,
@@ -183,14 +186,14 @@ public class ReportFormat {
     /**
      * This type encapsulates the summary of the data clumps report.
      *
-     * @param amountDataClumps the total amount of data clumps detected.
-     * @param amountFilesWithDataClumps the amount of files with data clumps.
+     * @param amountDataClumps                        the total amount of data clumps detected.
+     * @param amountFilesWithDataClumps               the amount of files with data clumps.
      * @param amountClassesOrInterfacesWithDataClumps the amount of classes or interfaces with data clumps.
-     * @param amountMethodsWithDataClumps the amount of methods with data clumps.
-     * @param fieldsToFieldsDataClump the amount of fields to fields data clumps.
-     * @param parametersToFieldsDataClump the amount of parameters to fields data clumps.
-     * @param parametersToParametersDataClump the amount of parameters to parameters data clumps.
-     * @param additional any additional information or summary.
+     * @param amountMethodsWithDataClumps             the amount of methods with data clumps.
+     * @param fieldsToFieldsDataClump                 the amount of fields to fields data clumps.
+     * @param parametersToFieldsDataClump             the amount of parameters to fields data clumps.
+     * @param parametersToParametersDataClump         the amount of parameters to parameters data clumps.
+     * @param additional                              any additional information or summary.
      */
     public record ReportSummary(@SerializedName("amount_data_clumps") int amountDataClumps,
 
@@ -208,18 +211,18 @@ public class ReportFormat {
     /**
      * This type encapsulates the information about the project or codebase the report was generated for.
      *
-     * @param projectUrl the URL of the project or codebase.
-     * @param projectName the name of the project or codebase.
-     * @param projectVersion the version of the project or codebase.
-     * @param projectCommitHash the commit hash of the project or codebase.
-     * @param projectTag the tag of the project or codebase.
-     * @param projectCommitDate the commit date of the project or codebase.
-     * @param numberOfFiles the total amount of files in the project or codebase.
+     * @param projectUrl                  the URL of the project or codebase.
+     * @param projectName                 the name of the project or codebase.
+     * @param projectVersion              the version of the project or codebase.
+     * @param projectCommitHash           the commit hash of the project or codebase.
+     * @param projectTag                  the tag of the project or codebase.
+     * @param projectCommitDate           the commit date of the project or codebase.
+     * @param numberOfFiles               the total amount of files in the project or codebase.
      * @param numberOfClassesOrInterfaces the total amount of classes or interfaces in the project or codebase.
-     * @param numberOfMethods the total amount of methods in the project or codebase.
-     * @param numberOfDataFields the total amount of data fields in the project or codebase.
-     * @param numberOfMethodParameters the total amount of method parameters in the project or codebase.
-     * @param additional any additional information about the project or codebase.
+     * @param numberOfMethods             the total amount of methods in the project or codebase.
+     * @param numberOfDataFields          the total amount of data fields in the project or codebase.
+     * @param numberOfMethodParameters    the total amount of method parameters in the project or codebase.
+     * @param additional                  any additional information about the project or codebase.
      */
     public record ProjectInfo(@SerializedName("project_url") String projectUrl,
                               @SerializedName("project_name") String projectName,
@@ -239,8 +242,8 @@ public class ReportFormat {
     /**
      * This type holds the configuration options for a specific detector during data clump analysis.
      *
-     * @param name the name of the detector used in the analysis.
-     * @param url the url of the detector used in the analysis.
+     * @param name    the name of the detector used in the analysis.
+     * @param url     the url of the detector used in the analysis.
      * @param version the version of the detector used in the analysis.
      * @param options The threshold value or metric that defines a data clump for the detector
      */
@@ -253,21 +256,21 @@ public class ReportFormat {
     /**
      * This type represents the context in which a data clump exists.
      *
-     * @param type The type of the context, in this case always 'data_clump'.
-     * @param key a unique identifier for the data clump context.
-     * @param probability the probability of the data clump.
-     * @param fromFilePath the file path of the file from which the data clump originates.
+     * @param type                     The type of the context, in this case always 'data_clump'.
+     * @param key                      a unique identifier for the data clump context.
+     * @param probability              the probability of the data clump.
+     * @param fromFilePath             the file path of the file from which the data clump originates.
      * @param fromClassOrInterfaceName the name of the class or interface from which the data clump originates.
-     * @param fromClassOrInterfaceKey a unique identifier for the class or interface from which the data clump originates.
-     * @param fromMethodName the name of the method from which the data clump originates.
-     * @param fromMethodKey a unique identifier for the method from which the data clump originates.
-     * @param toFilePath the file path of the file to which the data clump leads.
-     * @param toClassOrInterfaceName the name of the class or interface to which the data clump leads.
-     * @param toClassOrInterfaceKey a unique identifier for the class or interface to which the data clump leads.
-     * @param toMethodName the name of the method to which the data clump leads.
-     * @param toMethodKey a unique identifier for the method to which the data clump leads.
-     * @param dataClumpType The specific type of data clump: 'fields_to_fields', 'parameters_to_fields', or 'parameters_to_parameters'.
-     * @param dataClumpData a dictionary mapping keys to data clumps parameter from context.
+     * @param fromClassOrInterfaceKey  a unique identifier for the class or interface from which the data clump originates.
+     * @param fromMethodName           the name of the method from which the data clump originates.
+     * @param fromMethodKey            a unique identifier for the method from which the data clump originates.
+     * @param toFilePath               the file path of the file to which the data clump leads.
+     * @param toClassOrInterfaceName   the name of the class or interface to which the data clump leads.
+     * @param toClassOrInterfaceKey    a unique identifier for the class or interface to which the data clump leads.
+     * @param toMethodName             the name of the method to which the data clump leads.
+     * @param toMethodKey              a unique identifier for the method to which the data clump leads.
+     * @param dataClumpType            The specific type of data clump: 'fields_to_fields', 'parameters_to_fields', or 'parameters_to_parameters'.
+     * @param dataClumpData            a dictionary mapping keys to data clumps parameter from context.
      */
     public record DataClumpTypeContext(String type,
                                        String key,
@@ -287,15 +290,15 @@ public class ReportFormat {
     }
 
     /**
-     *  This type represents a parameter from the context in which a data clump exists.
+     * This type represents a parameter from the context in which a data clump exists.
      *
-     * @param key a unique identifier for the parameter.
-     * @param name the name of the parameter.
-     * @param type the data type of the parameter.
-     * @param modifiers the modifiers applied to the parameter, e.g. 'public', 'private', 'static'.
-     * @param position the position of the parameter in the file.
+     * @param key         a unique identifier for the parameter.
+     * @param name        the name of the parameter.
+     * @param type        the data type of the parameter.
+     * @param modifiers   the modifiers applied to the parameter, e.g. 'public', 'private', 'static'.
+     * @param position    the position of the parameter in the file.
      * @param probability the probability of the parameter being part of the data clump.
-     * @param toVariable the context of the parameter to which the data clump leads.
+     * @param toVariable  the context of the parameter to which the data clump leads.
      */
     public record DataClumpsVariableFromContext(String key, String name, String type, String[] modifiers,
                                                 Position position, double probability,
@@ -305,11 +308,11 @@ public class ReportFormat {
     /**
      * This type represents a parameter in the destination context matching a data clump.
      *
-     * @param key a unique identifier for the parameter.
-     * @param name the name of the parameter.
-     * @param type the data type of the parameter.
+     * @param key       a unique identifier for the parameter.
+     * @param name      the name of the parameter.
+     * @param type      the data type of the parameter.
      * @param modifiers the modifiers applied to the parameter, e.g. 'public', 'private', 'static'.
-     * @param position the position of the parameter in the file.
+     * @param position  the position of the parameter in the file.
      */
     public record DataClumpsVariableToContext(String key, String name, String type, String[] modifiers,
                                               Position position) {
@@ -318,10 +321,10 @@ public class ReportFormat {
     /**
      * This type represents a position in a source code
      *
-     * @param startLine the line where the position starts
+     * @param startLine   the line where the position starts
      * @param startColumn the column where the position starts
-     * @param endLine the line where the position ends
-     * @param endColumn the column where the position ends
+     * @param endLine     the line where the position ends
+     * @param endColumn   the column where the position ends
      */
     public record Position(int startLine, int startColumn, int endLine, int endColumn) {
     }

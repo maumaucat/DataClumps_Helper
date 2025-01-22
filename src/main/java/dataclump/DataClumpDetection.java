@@ -189,12 +189,12 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                     }
                 }
-            }
 
-            if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                long end = System.nanoTime();
-                long time = end - start;
-                DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), currentElement, otherElement, matchingProperties, time));
+                if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                    long end = System.nanoTime();
+                    long time = end - start;
+                    DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), time, ReportFormat.getDataClumpsTypeContext(currentElement, otherElement, matchingProperties)));
+                }
             }
         }
 
@@ -317,7 +317,7 @@ public class DataClumpDetection extends LocalInspectionTool {
     }
 
     private boolean checkField(JSClass psiClass, Classfield classfield) {
-        if (classfield.isStatic()) return false;
+        if (PsiUtil.runReadActionWithResult(classfield::isStatic)) return false;
 
         PsiElement psiField = PsiUtil.getPsiField(psiClass, classfield);
         assert psiField != null;
@@ -334,11 +334,11 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     private boolean check(PsiElement element1, PsiElement element2) {
 
-        if (!element1.isValid()) {
+        if (!PsiUtil.runReadActionWithResult(element1::isValid)) {
             Index.removeElement(element2);
             return false;
         }
-        if (!element2.isValid()) {
+        if (!PsiUtil.runReadActionWithResult(element2::isValid)) {
             Index.removeElement(element2);
             return false;
         }

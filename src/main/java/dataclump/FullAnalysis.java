@@ -318,8 +318,8 @@ public class FullAnalysis extends AnAction {
             methodsWithDataClumps.add(fromElement);
         }
 
-        filesWithDataClumps.add(fromElement.getContainingFile());
-        filesWithDataClumps.add(toElement.getContainingFile());
+        filesWithDataClumps.add(PsiUtil.runReadActionWithResult(fromElement::getContainingFile));
+        filesWithDataClumps.add(PsiUtil.runReadActionWithResult(toElement::getContainingFile));
 
         ReportFormat.DataClumpTypeContext dataClumpTypeContext = ReportFormat.getDataClumpsTypeContext(fromElement, toElement, variables);
 

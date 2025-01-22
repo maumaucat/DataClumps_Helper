@@ -5,10 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import dataclump.FullAnalysis;
 import org.jetbrains.annotations.NotNull;
-import util.CodeSmellLogger;
-import util.Index;
-import util.Property;
-import util.PsiUtil;
+import util.*;
 
 import java.io.*;
 import java.time.LocalDateTime;
@@ -172,20 +169,14 @@ public class DiagnosticTool {
         String project;
         String timeOfMeasurement;
         double durationInMilliSeconds;
-        String element1;
-        String element2;
-        List<String> dataClump;
+        ReportFormat.DataClumpTypeContext dataClump;
 
-        public DetectionMeasurement(Project project, PsiElement element1, PsiElement element2, List<Property> dataClump, long durationNanoSeconds) {
+
+        public DetectionMeasurement(Project project, long durationNanoSeconds, ReportFormat.DataClumpTypeContext dataClump) {
             this.project = project.getName();
             this.timeOfMeasurement = getCurrentDateTime();
             this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
-            this.element1 = PsiUtil.getQualifiedName(element1);
-            this.element2 = PsiUtil.getQualifiedName(element2);
-            this.dataClump = new ArrayList<>();
-            for (Property property : dataClump) {
-                this.dataClump.add(property.toString());
-            }
+            this.dataClump = dataClump;
         }
     }
 
@@ -247,20 +238,13 @@ public class DiagnosticTool {
         String project;
         String timeOfMeasurement;
         double durationInMilliSeconds;
-        String element1;
-        String element2;
-        List<String> dataClump;
+        ReportFormat.DataClumpTypeContext dataClump;
 
-        public RefactoringMeasurement(Project project, PsiElement element1, PsiElement element2, List<Property> dataClump, long durationNanoSeconds) {
+        public RefactoringMeasurement(Project project, long durationNanoSeconds, ReportFormat.DataClumpTypeContext dataClump) {
             this.project = project.getName();
             this.timeOfMeasurement = getCurrentDateTime();
             this.durationInMilliSeconds = durationNanoSeconds / 1000000.0;
-            this.element1 = PsiUtil.getQualifiedName(element1);
-            this.element2 = PsiUtil.getQualifiedName(element2);
-            this.dataClump = new ArrayList<>();
-            for (Property property : dataClump) {
-                this.dataClump.add(property.toString());
-            }
+            this.dataClump = dataClump;
         }
 
     }

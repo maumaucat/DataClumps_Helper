@@ -234,7 +234,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
             if (DiagnosticTool.DIAGNOSTIC_MODE) {
                 long endTime = System.nanoTime();
                 long duration = (endTime - startTime);
-                DiagnosticTool.addMeasurement(new DiagnosticTool.RefactoringMeasurement(project, this.currentElement.getElement(), this.otherElement.getElement(), matchingProperties, duration));
+                DiagnosticTool.addMeasurement(new DiagnosticTool.RefactoringMeasurement(project, duration, ReportFormat.getDataClumpsTypeContext(this.currentElement.getElement(), this.otherElement.getElement(), matchingProperties)));
             }
         });
 
