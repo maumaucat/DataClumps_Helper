@@ -40,8 +40,6 @@ public class FileChangeListener implements BulkFileListener {
             VirtualFile file = event.getFile();
             if (file != null && file.isValid() && file.getName().endsWith(".ts")) {
 
-                CodeSmellLogger.info("FileChangeListener: File " + file.getName() + " changed.");
-
                 // only proceed if index is built
                 if (!Index.isIndexBuilt()) continue;
 
@@ -50,12 +48,9 @@ public class FileChangeListener implements BulkFileListener {
                 PsiManager manager = PsiManager.getInstance(project);
                 PsiFile psiFile = manager.findFile(file);
                 if (psiFile == null || !psiFile.isValid()) continue;
-                CodeSmellLogger.info("FileChangeListener: File " + file.getName() + " is valid.");
 
                 // iterate all functions in file -> invoke inspection
                 for (TypeScriptFunction psiElement : PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class)) {
-                    CodeSmellLogger.info("FileChangeListener: Invoking inspection for function " + psiElement.getName());
-                    CodeSmellLogger.info("FileChangeListener: Function is valid " + psiElement.isValid());
                     DataClumpUtil.invokeInspection(psiElement);
                 }
 
@@ -65,8 +60,6 @@ public class FileChangeListener implements BulkFileListener {
 
                 // iterate all classes in file -> invoke inspection
                 for (PsiElement psiElement : allClasses) {
-                    CodeSmellLogger.info("FileChangeListener: Invoking inspection for class " + ((TypeScriptClass) psiElement).getName());
-                    CodeSmellLogger.info("FileChangeListener: Class is valid " + psiElement.isValid());
                     DataClumpUtil.invokeInspection(psiElement);
                 }
 
@@ -76,8 +69,6 @@ public class FileChangeListener implements BulkFileListener {
                 ));
 
                 for (PsiElement psiElement : allInterfaces) {
-                    CodeSmellLogger.info("FileChangeListener: Invoking inspection for interface " + ((TypeScriptInterface) psiElement).getName());
-                    CodeSmellLogger.info("FileChangeListener: Interface is valid " + psiElement.isValid());
                     DataClumpUtil.invokeInspection(psiElement);
                 }
 

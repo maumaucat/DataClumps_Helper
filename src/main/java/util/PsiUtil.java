@@ -31,6 +31,8 @@ import javax.swing.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -134,6 +136,17 @@ public class PsiUtil {
         assert psiFunction != null;
 
         return runReadActionWithResult(psiFunction::getParameterList);
+    }
+
+    public static JSArgumentList createJSArgumentListFromText(PsiElement context, String text) {
+        StringBuilder functionCode = new StringBuilder("psiUtilTemp");
+        functionCode.append(text);
+        functionCode.append(";");
+
+        PsiFile psiFile = runWriteCommandWithResult(context.getProject(), () -> PsiFileFactory.getInstance(context.getProject())
+                .createFileFromText("PsiUtilTemp.ts", TypeScriptFileType.INSTANCE, functionCode));
+
+        return PsiTreeUtil.getChildOfType(Objects.requireNonNull(PsiTreeUtil.getChildOfType(psiFile, JSExpressionStatement.class)).getFirstChild(), JSArgumentList.class);
     }
 
     /**
@@ -1047,5 +1060,48 @@ public class PsiUtil {
         return WriteCommandAction.writeCommandAction(project).compute(action::get);
     }
 
+    public static <T> T runEDTWithResult(Supplier<T> task) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+
+        // execute the task on the EDT
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                T result = task.get();  // execute the task and get the result
+                future.complete(result); // inform the future about the result
+            } catch (Exception e) {
+                CodeSmellLogger.error("Error in UI Thread", e);
+            }
+        });
+
+        try {
+            // wait for the result of the task
+            return future.get();
+        } catch (InterruptedException e) {
+            CodeSmellLogger.error("Interrupted UI Thread", e);
+            return null;
+        } catch (ExecutionException e) {
+            CodeSmellLogger.error("Execution failed in UI Thread", e);
+            return null;
+        }
+    }
+
+    public static <T> T executeInEDTAndWait(Supplier<T> task) {
+        // Ergebnis-Container für die Rückgabe der Aufgabe
+        final Object[] result = new Object[1];
+
+        // Führe die Aufgabe im EDT aus
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            try {
+                // Die Aufgabe im EDT ausführen und das Ergebnis speichern
+                result[0] = task.get();
+            } catch (Exception e) {
+                CodeSmellLogger.error("Error in UI Thread", e);
+            }
+        });
+
+        // Rückgabe des Ergebnisses der Aufgabe
+        return (T) result[0];
+    }
 
 }
+
