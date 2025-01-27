@@ -10,8 +10,7 @@ import util.*;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -56,8 +55,9 @@ public class DiagnosticTool {
             return;
         }
         DIAGNOSTIC_MODE = true;
+        String detectionEnabled = Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true") ? "_Detection_" : "";
         FILE_PATH_DETECTION = resultPath + "\\detectionMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
-        FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_"+ detectionEnabled  + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_INDEX = resultPath + "\\indexMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_REFACTORING = resultPath + "\\refactoringMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
 

@@ -151,7 +151,9 @@ public class DataClumpDetection extends LocalInspectionTool {
                 // report the data clump to the full analysis if required
                 if (report) {
                     FullAnalysis.report(currentElement, otherElement, matchingProperties);
-                    return;
+                    if (!DiagnosticTool.DIAGNOSTIC_MODE || !Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true")) {
+                        return;
+                    }
                 }
 
                 // mark the data clump as a problem
@@ -171,19 +173,14 @@ public class DataClumpDetection extends LocalInspectionTool {
                         String currentElementType = currentElement instanceof JSClass ? "class" : "function";
                         String otherElementType = otherElement instanceof JSClass ? "class" : "function";
 
-                        String description = "Data Clump between " + currentElementType + " " + PsiUtil.getQualifiedName(currentElement) +
-                                " and " + otherElementType + " " + PsiUtil.getQualifiedName(otherElement) +
-                                ". Matching Properties " + matchingProperties + ".";
-
-                        if (canRefactor(currentElement) && canRefactor(otherElement)) {
-                            holder.registerProblem(dataClumpElement,
-                                    description,
-                                    new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
-                        } else {
-                            holder.registerProblem(dataClumpElement, description +
-                                    " This data clump can not be refactored automatically."
-                            );
-                        }
+                        String description = "Data Clump between " + currentElementType + " " + PsiUtil.getQualifiedName(currentElement) + " and " + otherElementType + " " + PsiUtil.getQualifiedName(otherElement) + ". Matching Properties " + matchingProperties + ".";
+                        ApplicationManager.getApplication().runReadAction(() -> {
+                            if (canRefactor(currentElement) && canRefactor(otherElement)) {
+                                holder.registerProblem(dataClumpElement, description, new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
+                            } else {
+                                holder.registerProblem(dataClumpElement, description + " This data clump can not be refactored automatically.");
+                            }
+                        });
 
                     }
                 }
@@ -368,7 +365,7 @@ public class DataClumpDetection extends LocalInspectionTool {
         if (hierarchy.isEmpty()) return false;
         for (JSClass psiClass : hierarchy) {
             if (psiClass == containingClass) continue;
-            if (PsiUtil.runReadActionWithResult(()->psiClass.findFunctionByName(function.getName()) != null)) {
+            if (PsiUtil.runReadActionWithResult(() -> psiClass.findFunctionByName(function.getName()) != null)) {
                 return true;
             }
         }
@@ -408,8 +405,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      * @return true if the field is overriding another field of an interface, false otherwise
      */
     private boolean isOverriding(JSClass psiClass, PsiElement psiElement) {
-        List<JSClass> hierarchy =
-                resolveHierarchy(psiClass);
+        List<JSClass> hierarchy = resolveHierarchy(psiClass);
         if (hierarchy.isEmpty()) return false;
 
         for (JSClass superClass : hierarchy) {
