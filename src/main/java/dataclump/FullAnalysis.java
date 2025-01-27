@@ -121,6 +121,8 @@ public class FullAnalysis extends AnAction {
                     typescriptFiles.addAll(FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)));
                 });
 
+                CodeSmellLogger.info("Found " + typescriptFiles.size() + " TypeScript files");
+
                 // initialize variables to store the counting information for the report
                 dataClumps = new HashMap<>();
                 amountDataClumps = 0;

@@ -1273,7 +1273,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
                 AtomicInteger response = new AtomicInteger();
                 ApplicationManager.getApplication().invokeLater(() -> {
                     response.set(Messages.showYesNoDialog(psiFunction.getProject(), "<html><body>" + psiFunction.getText() + "<br><br>" + "</body></html>", "Can this function be used as a getter for the field </b> \"" + fieldName + "\"?", Messages.getQuestionIcon()));
-
                 });
                 if (response.get() == Messages.NO) {
                     return true;

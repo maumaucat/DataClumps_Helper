@@ -138,6 +138,13 @@ public class PsiUtil {
         return runReadActionWithResult(psiFunction::getParameterList);
     }
 
+    /**
+     * Creates a new argument list in the given context. The argument list is created from the given text.
+     *
+     * @param context The context in which the argument list should be created.
+     * @param text    The text of the argument list. For example, "(1, "mux", 3)".
+     * @return The created argument list.
+     */
     public static JSArgumentList createJSArgumentListFromText(PsiElement context, String text) {
         StringBuilder functionCode = new StringBuilder("psiUtilTemp");
         functionCode.append(text);
@@ -292,7 +299,6 @@ public class PsiUtil {
         assert wrapper != null;
 
         return runReadActionWithResult(() -> wrapper.getConstructors()[0]);
-
 
 
     }
@@ -1060,46 +1066,27 @@ public class PsiUtil {
         return WriteCommandAction.writeCommandAction(project).compute(action::get);
     }
 
-    public static <T> T runEDTWithResult(Supplier<T> task) {
-        CompletableFuture<T> future = new CompletableFuture<>();
-
-        // execute the task on the EDT
-        ApplicationManager.getApplication().invokeLater(() -> {
-            try {
-                T result = task.get();  // execute the task and get the result
-                future.complete(result); // inform the future about the result
-            } catch (Exception e) {
-                CodeSmellLogger.error("Error in UI Thread", e);
-            }
-        });
-
-        try {
-            // wait for the result of the task
-            return future.get();
-        } catch (InterruptedException e) {
-            CodeSmellLogger.error("Interrupted UI Thread", e);
-            return null;
-        } catch (ExecutionException e) {
-            CodeSmellLogger.error("Execution failed in UI Thread", e);
-            return null;
-        }
-    }
-
+    /**
+     * Runs the given action in the EDT and waits for it to finish. Returns the result of the action.
+     *
+     * @param task the action to be run
+     * @param <T>  the type of the result
+     * @return the result of the action
+     */
     public static <T> T executeInEDTAndWait(Supplier<T> task) {
-        // Ergebnis-Container für die Rückgabe der Aufgabe
+        // container to store the result of the task
         final Object[] result = new Object[1];
 
-        // Führe die Aufgabe im EDT aus
+        // run the task in the EDT and wait for it to finish
         ApplicationManager.getApplication().invokeAndWait(() -> {
             try {
-                // Die Aufgabe im EDT ausführen und das Ergebnis speichern
                 result[0] = task.get();
             } catch (Exception e) {
                 CodeSmellLogger.error("Error in UI Thread", e);
             }
         });
 
-        // Rückgabe des Ergebnisses der Aufgabe
+        // return the result of the task
         return (T) result[0];
     }
 
