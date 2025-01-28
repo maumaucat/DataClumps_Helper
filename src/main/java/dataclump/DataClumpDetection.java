@@ -109,20 +109,20 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     public void detectDataClump(PsiElement currentElement, ProblemsHolder holder, boolean report) {
 
-            long start = 0;
-            if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                start = System.nanoTime();
-            }
+        long start = 0;
+        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+            start = System.nanoTime();
+        }
 
-            HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
+        HashMap<PsiElement, List<Property>> potentialDataClumps = new HashMap<>();
 
-            if (currentElement instanceof JSClass currentClass) {
-                potentialDataClumps = calculatePotentialDataClumpsForClass(currentClass);
-            } else if (currentElement instanceof TypeScriptFunction currentFunction) {
-                potentialDataClumps = calculatePotentialDataClumpsForFunction(currentFunction);
-            }
+        if (currentElement instanceof JSClass currentClass) {
+            potentialDataClumps = calculatePotentialDataClumpsForClass(currentClass);
+        } else if (currentElement instanceof TypeScriptFunction currentFunction) {
+            potentialDataClumps = calculatePotentialDataClumpsForFunction(currentFunction);
+        }
 
-            processPotentialDataClumps(potentialDataClumps, holder, currentElement, start, report);
+        processPotentialDataClumps(potentialDataClumps, holder, currentElement, start, report);
     }
 
     /**
@@ -177,10 +177,8 @@ public class DataClumpDetection extends LocalInspectionTool {
                         String description = "Data Clump between " + currentElementType + " " + PsiUtil.getQualifiedName(currentElement) + " and " + otherElementType + " " + PsiUtil.getQualifiedName(otherElement) + ". Matching Properties " + matchingProperties + ".";
                         ApplicationManager.getApplication().runReadAction(() -> {
                             if (canRefactor(currentElement) && canRefactor(otherElement)) {
-                                CodeSmellLogger.info("REGISTER PROBLEM");
                                 holder.registerProblem(dataClumpElement, description, new DataClumpRefactoring(currentElement, otherElement, new ArrayList<>(matchingProperties)));
                             } else {
-                                CodeSmellLogger.info("REGISTER PROBLEM");
                                 holder.registerProblem(dataClumpElement, description + " This data clump can not be refactored automatically.");
                             }
                         });
@@ -391,7 +389,7 @@ public class DataClumpDetection extends LocalInspectionTool {
      */
     private boolean isOverriding(TypeScriptFunction function1, TypeScriptFunction function2) {
 
-        if (!Objects.equals(function1.getName(), function2.getName())) return false;
+        if (!Objects.equals(PsiUtil.getName(function1), PsiUtil.getName(function2))) return false;
         JSClass containingClass1 = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function1, JSClass.class));
         if (containingClass1 == null) return false;
         JSClass containingClass2 = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getParentOfType(function2, JSClass.class));
@@ -440,14 +438,8 @@ public class DataClumpDetection extends LocalInspectionTool {
         List<JSClass> implementedInterfaces = new ArrayList<>();
 
         ApplicationManager.getApplication().runReadAction(() -> {
+            extendedClasses.addAll(Arrays.asList(tsClass.getSuperClasses()));
 
-            try {
-                extendedClasses.addAll(Arrays.asList(tsClass.getSuperClasses()));
-            } catch (Exception e) {
-                CodeSmellLogger.info("Error Resolving Hierarchy: " + tsClass.getName());
-                CodeSmellLogger.info("Resolving Hierarchy: valid " + PsiUtil.getName(tsClass));
-                throw e;
-            }
             implementedInterfaces.addAll(Arrays.asList(tsClass.getImplementedInterfaces()));
         });
 

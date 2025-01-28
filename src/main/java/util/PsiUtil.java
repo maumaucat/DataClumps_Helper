@@ -816,7 +816,7 @@ public class PsiUtil {
      * @param parameter The parameter to be found.
      * @return The TypeScriptParameter that corresponds to the given parameter. Null if the parameter is not found.
      */
-    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Parameter parameter) {
+    public static TypeScriptParameter getPsiParameter(TypeScriptFunction function, Property parameter) {
 
         for (JSParameterListElement psiParameter : runReadActionWithResult(function::getParameters)) {
             if (!(psiParameter instanceof TypeScriptParameter)) continue;

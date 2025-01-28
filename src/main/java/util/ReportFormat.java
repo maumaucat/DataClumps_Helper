@@ -1,6 +1,7 @@
 package util;
 
 import com.google.gson.annotations.SerializedName;
+import com.google.rpc.Code;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;
@@ -50,9 +51,9 @@ public class ReportFormat {
                 fromVariable = PsiUtil.getPsiParameter((TypeScriptFunction) fromElement, property.getName());
             }
             if (toElement instanceof JSClass) {
-                toVariable = PsiUtil.getPsiField((JSClass) toElement, (Classfield) property);
+                 toVariable = PsiUtil.getPsiField((JSClass) toElement, (Classfield) property);
             } else {
-                toVariable = PsiUtil.getPsiParameter((TypeScriptFunction) toElement, property.getName());
+                toVariable = PsiUtil.getPsiParameter((TypeScriptFunction) toElement, property);
             }
             assert fromVariable != null;
             assert toVariable != null;
