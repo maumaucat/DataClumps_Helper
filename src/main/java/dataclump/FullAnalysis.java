@@ -18,6 +18,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -100,206 +101,214 @@ public class FullAnalysis extends AnAction {
 
         Project project = Index.getProject();
 
-        // run the analysis in a background task, so the UI is not blocked
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Analyzing") {
+        DumbService.getInstance(project).runWhenSmart(() -> {
+            // run the analysis in a background task, so the UI is not blocked
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Analyzing") {
 
-            @Override
-            public void run(@NotNull ProgressIndicator progressIndicator) {
+                @Override
+                public void run(@NotNull ProgressIndicator progressIndicator) {
 
-                long startTime = 0;
-                if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                    startTime = System.nanoTime();
-                }
-
-                CodeSmellLogger.info("Running full analysis");
-
-                PsiManager manager = PsiManager.getInstance(project);
-
-                // Run the read action to collect TypeScript files
-                Collection<VirtualFile> typescriptFiles = new ArrayList<>();
-                ApplicationManager.getApplication().runReadAction(() -> {
-                    typescriptFiles.addAll(FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)));
-                });
-
-                CodeSmellLogger.info("Found " + typescriptFiles.size() + " TypeScript files");
-
-                // initialize variables to store the counting information for the report
-                dataClumps = new HashMap<>();
-                amountDataClumps = 0;
-                fieldsToFieldsDataClump = 0;
-                parametersToFieldsDataClump = 0;
-                parametersToParametersDataClump = 0;
-                int numberOfClassesOrInterfaces = 0;
-                int numberOfMethods = 0;
-                int numberOfDataFields = 0;
-                int numberOfMethodParameters = 0;
-
-                // initialize the count for the file iteration (so the progress can be logged)
-                int count = 1;
-
-                DataClumpDetection inspection = new DataClumpDetection();
-
-                // iterate all TypeScript files in the project
-                for (VirtualFile virtualFile : typescriptFiles) {
-                    CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + "(" + count + "/" + typescriptFiles.size() + ")");
-
-                    long startTimeFile = 0;
+                    long startTime = 0;
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                        startTimeFile = System.nanoTime();
+                        startTime = System.nanoTime();
                     }
-
-                    // read the psiFile in a read action
-                    final PsiFile[] psiFileWrap = new PsiFile[1]; // Using an array to make it effectively final
-                    ApplicationManager.getApplication().runReadAction(() -> {
-                        psiFileWrap[0] = manager.findFile(virtualFile);
-                    });
-                    PsiFile psiFile = psiFileWrap[0];
-
-                    // collect all functions in the file in a read action
-                    Collection<TypeScriptFunction> functions = new ArrayList<>();
-                    ApplicationManager.getApplication().runReadAction(() -> {
-                        functions.addAll(PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class));
+                    ApplicationManager.getApplication().invokeAndWait(() -> {
+                        PsiManager.getInstance(project).dropPsiCaches();
                     });
 
 
-                    // iterate all functions in the file and collect the data clump problems
-                    for (TypeScriptFunction psiElement : functions) {
-                        numberOfMethods++;
-                        if (!PsiUtil.runReadActionWithResult(psiElement::isValid))
-                            CodeSmellLogger.error("Invalid Function: " + psiElement, new Exception());
-                        // Skip constructors
-                        if (PsiUtil.runReadActionWithResult(psiElement::isConstructor)) continue;
+                    CodeSmellLogger.info("Running full analysis");
 
-                        // Detect data clumps if the number of parameters is greater than the required minimum
-                        List<Parameter> parameters = Index.getFunctionsToParameters().get(psiElement);
-                        numberOfMethodParameters += parameters != null ? parameters.size() : 0;
-                        if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                            inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                    InspectionManager.getInstance(project),
-                                    psiFile,
-                                    false
-                            ), true);
+                    PsiManager manager = PsiManager.getInstance(project);
+
+                    // Run the read action to collect TypeScript files
+                    Collection<VirtualFile> typescriptFiles = new ArrayList<>();
+                    ApplicationManager.getApplication().runReadAction(() -> {
+                        typescriptFiles.addAll(FileTypeIndex.getFiles(TypeScriptFileType.INSTANCE, GlobalSearchScope.projectScope(project)));
+                    });
+
+                    CodeSmellLogger.info("Found " + typescriptFiles.size() + " TypeScript files");
+
+                    // initialize variables to store the counting information for the report
+                    dataClumps = new HashMap<>();
+                    amountDataClumps = 0;
+                    fieldsToFieldsDataClump = 0;
+                    parametersToFieldsDataClump = 0;
+                    parametersToParametersDataClump = 0;
+                    int numberOfClassesOrInterfaces = 0;
+                    int numberOfMethods = 0;
+                    int numberOfDataFields = 0;
+                    int numberOfMethodParameters = 0;
+
+                    // initialize the count for the file iteration (so the progress can be logged)
+                    int count = 1;
+
+                    DataClumpDetection inspection = new DataClumpDetection();
+
+                    // iterate all TypeScript files in the project
+                    for (VirtualFile virtualFile : typescriptFiles) {
+                        CodeSmellLogger.info("Analyzing file: " + virtualFile.getName() + "(" + count + "/" + typescriptFiles.size() + ")");
+
+                        long startTimeFile = 0;
+                        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                            startTimeFile = System.nanoTime();
+                        }
+
+                        // read the psiFile in a read action
+                        final PsiFile[] psiFileWrap = new PsiFile[1]; // Using an array to make it effectively final
+                        ApplicationManager.getApplication().runReadAction(() -> {
+                            psiFileWrap[0] = manager.findFile(virtualFile);
+                        });
+                        PsiFile psiFile = psiFileWrap[0];
+
+                        // collect all functions in the file in a read action
+                        Collection<TypeScriptFunction> functions = new ArrayList<>();
+                        ApplicationManager.getApplication().runReadAction(() -> {
+                            functions.addAll(PsiTreeUtil.findChildrenOfType(psiFile, TypeScriptFunction.class));
+                        });
+
+
+                        // iterate all functions in the file and collect the data clump problems
+                        for (TypeScriptFunction psiElement : functions) {
+                            numberOfMethods++;
+                            if (!PsiUtil.runReadActionWithResult(psiElement::isValid))
+                                CodeSmellLogger.error("Invalid Function: " + psiElement, new Exception());
+                            // Skip constructors
+                            if (PsiUtil.runReadActionWithResult(psiElement::isConstructor)) continue;
+
+                            // Detect data clumps if the number of parameters is greater than the required minimum
+                            List<Parameter> parameters = Index.getFunctionsToParameters().get(psiElement);
+                            numberOfMethodParameters += parameters != null ? parameters.size() : 0;
+                            if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                        InspectionManager.getInstance(project),
+                                        psiFile,
+                                        false
+                                ), true);
+                            }
+                        }
+
+                        // collect all classes in the file in a read action
+                        Collection<PsiElement> allClasses = new ArrayList<>();
+                        ApplicationManager.getApplication().runReadAction(() -> {
+                            allClasses.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                                    element instanceof TypeScriptClass
+                            )));
+                        });
+
+                        // iterate all classes in the file and collect the data clump problems
+                        for (PsiElement psiElement : allClasses) {
+                            numberOfClassesOrInterfaces++;
+                            List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
+                            numberOfDataFields += classfields != null ? classfields.size() : 0;
+                            if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                        InspectionManager.getInstance(project),
+                                        psiFile,
+                                        false
+                                ), true);
+                            }
+
+                        }
+
+                        // collect all interfaces in the file in a read action
+                        Collection<PsiElement> allInterfaces = new ArrayList<>();
+                        ApplicationManager.getApplication().runReadAction(() -> {
+                            allInterfaces.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
+                                    element instanceof TypeScriptInterface
+                            )));
+                        });
+
+                        // iterate all interfaces in the file and collect the data clump problems
+                        for (PsiElement psiElement : allInterfaces) {
+                            numberOfClassesOrInterfaces++;
+                            List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
+                            numberOfDataFields += classfields != null ? classfields.size() : 0;
+                            if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(
+                                        InspectionManager.getInstance(project),
+                                        psiFile,
+                                        false
+                                ), true);
+                            }
+                        }
+
+                        count++;
+
+                        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                            long endTimeFile = System.nanoTime();
+                            long durationFile = (endTimeFile - startTimeFile);
+                            DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisFileMeasurement(virtualFile.getName(), durationFile));
                         }
                     }
 
-                    // collect all classes in the file in a read action
-                    Collection<PsiElement> allClasses = new ArrayList<>();
-                    ApplicationManager.getApplication().runReadAction(() -> {
-                        allClasses.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                                element instanceof TypeScriptClass
-                        )));
-                    });
+                    // information about the settings
+                    HashMap<String, String> options = new HashMap<>();
+                    options.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
+                    options.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
+                    options.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
 
-                    // iterate all classes in the file and collect the data clump problems
-                    for (PsiElement psiElement : allClasses) {
-                        numberOfClassesOrInterfaces++;
-                        List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
-                        numberOfDataFields += classfields != null ? classfields.size() : 0;
-                        if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                            inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                    InspectionManager.getInstance(project),
-                                    psiFile,
-                                    false
-                            ), true);
-                        }
+                    // information about the detector (this Plugin)
+                    ReportFormat.DataClumpsDetectorContext detector = new ReportFormat.DataClumpsDetectorContext(
+                            "Data Clump Helper",
+                            null,
+                            Objects.requireNonNull(PluginManagerCore.getPlugin(PluginId.getId("de.marlena.data.clump.helper"))).getVersion(),
+                            options
+                    );
 
-                    }
+                    // summary information for the report (amount of data clumps, files, classes, methods, and fields etc)
+                    ReportFormat.ReportSummary summary = new ReportFormat.ReportSummary(
+                            amountDataClumps,
+                            filesWithDataClumps.size(),
+                            classesOrInterfacesWithDataClumps.size(),
+                            methodsWithDataClumps.size(),
+                            fieldsToFieldsDataClump,
+                            parametersToFieldsDataClump,
+                            parametersToParametersDataClump,
+                            ""
+                    );
 
-                    // collect all interfaces in the file in a read action
-                    Collection<PsiElement> allInterfaces = new ArrayList<>();
-                    ApplicationManager.getApplication().runReadAction(() -> {
-                        allInterfaces.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                                element instanceof TypeScriptInterface
-                        )));
-                    });
+                    // information about the project
+                    ReportFormat.ProjectInfo projectInfo = new ReportFormat.ProjectInfo(
+                            null,
+                            project.getName(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            typescriptFiles.size(),
+                            numberOfClassesOrInterfaces,
+                            numberOfMethods,
+                            numberOfDataFields,
+                            numberOfMethodParameters,
+                            ""
+                    );
 
-                    // iterate all interfaces in the file and collect the data clump problems
-                    for (PsiElement psiElement : allInterfaces) {
-                        numberOfClassesOrInterfaces++;
-                        List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
-                        numberOfDataFields += classfields != null ? classfields.size() : 0;
-                        if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                            inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                    InspectionManager.getInstance(project),
-                                    psiFile,
-                                    false
-                            ), true);
-                        }
-                    }
+                    // create the context for the report
+                    ReportFormat.DataClumpsTypeContext context = new ReportFormat.DataClumpsTypeContext(
+                            "1.0",
+                            detector,
+                            dataClumps,
+                            getCurrentDateTime(),
+                            "TypeScript",
+                            summary,
+                            projectInfo
+                    );
 
-                    count++;
+                    // write the context to the file
+                    writeToFile(context, resultPath);
+                    CodeSmellLogger.info("Full analysis completed");
 
                     if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                        long endTimeFile = System.nanoTime();
-                        long durationFile = (endTimeFile - startTimeFile);
-                        DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisFileMeasurement(virtualFile.getName(), durationFile));
+                        long endTime = System.nanoTime();
+                        long duration = (endTime - startTime);
+                        DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisMeasurement(project, duration));
                     }
                 }
+            });
 
-                // information about the settings
-                HashMap<String, String> options = new HashMap<>();
-                options.put("DIAGNOSTIC_MODE", String.valueOf(DiagnosticTool.DIAGNOSTIC_MODE));
-                options.put("MIN_NUMBER_OF_PROPERTIES", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties));
-                options.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
-
-                // information about the detector (this Plugin)
-                ReportFormat.DataClumpsDetectorContext detector = new ReportFormat.DataClumpsDetectorContext(
-                        "Data Clump Helper",
-                        null,
-                        Objects.requireNonNull(PluginManagerCore.getPlugin(PluginId.getId("de.marlena.data.clump.helper"))).getVersion(),
-                        options
-                );
-
-                // summary information for the report (amount of data clumps, files, classes, methods, and fields etc)
-                ReportFormat.ReportSummary summary = new ReportFormat.ReportSummary(
-                        amountDataClumps,
-                        filesWithDataClumps.size(),
-                        classesOrInterfacesWithDataClumps.size(),
-                        methodsWithDataClumps.size(),
-                        fieldsToFieldsDataClump,
-                        parametersToFieldsDataClump,
-                        parametersToParametersDataClump,
-                        ""
-                );
-
-                // information about the project
-                ReportFormat.ProjectInfo projectInfo = new ReportFormat.ProjectInfo(
-                        null,
-                        project.getName(),
-                        null,
-                        null,
-                        null,
-                        null,
-                        typescriptFiles.size(),
-                        numberOfClassesOrInterfaces,
-                        numberOfMethods,
-                        numberOfDataFields,
-                        numberOfMethodParameters,
-                        ""
-                );
-
-                // create the context for the report
-                ReportFormat.DataClumpsTypeContext context = new ReportFormat.DataClumpsTypeContext(
-                        "1.0",
-                        detector,
-                        dataClumps,
-                        getCurrentDateTime(),
-                        "TypeScript",
-                        summary,
-                        projectInfo
-                );
-
-                // write the context to the file
-                writeToFile(context, resultPath);
-                CodeSmellLogger.info("Full analysis completed");
-
-                if (DiagnosticTool.DIAGNOSTIC_MODE) {
-                    long endTime = System.nanoTime();
-                    long duration = (endTime - startTime);
-                    DiagnosticTool.addMeasurement(new DiagnosticTool.FullAnalysisMeasurement(project, duration));
-                }
-            }
         });
+
     }
 
     /**
