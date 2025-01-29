@@ -191,7 +191,7 @@ tasks {
         jvmArgs = listOf(
             "-Djava.awt.headless=true",
             "-Ddataclump.diagnostic.tool=true",
-            "-Ddataclump.diagnostic.includeDetection=false",
+            "-Ddataclump.diagnostic.includeDetection=true",
             "-Ddataclump.projectpath=$projectPath",
             "-Ddataclump.resultpath=$resultPath",
         )

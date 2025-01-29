@@ -1,13 +1,10 @@
 package evoluation;
 
-import com.google.gson.*;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiElement;
 import dataclump.FullAnalysis;
 import org.jetbrains.annotations.NotNull;
 import util.*;
 
-import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -33,6 +30,8 @@ public class DiagnosticTool {
      * If this flag indicates whether the time measurements are currently being recorded.
      */
     public static boolean DIAGNOSTIC_MODE = false;
+    public static boolean DETECTION_ENABLED = false;
+    public static boolean REFACTORING_ENABLED = true;
     /**
      * The paths to the files where the measurements are stored.
      */
@@ -55,6 +54,9 @@ public class DiagnosticTool {
             return;
         }
         DIAGNOSTIC_MODE = true;
+        if (Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true")) {
+            DETECTION_ENABLED = true;
+        }
         String detectionEnabled = Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true") ? "_Detection_" : "";
         FILE_PATH_DETECTION = resultPath + "\\detectionMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_"+ detectionEnabled  + project.getName() + "_" + getCurrentDateTime() + ".json";
@@ -106,6 +108,9 @@ public class DiagnosticTool {
      * @param newMeasurement the new measurement to be added
      */
     public static void addMeasurement(RefactoringMeasurement newMeasurement) {
+        if (FILE_PATH_REFACTORING == null) {
+            FILE_PATH_REFACTORING = "C:\\Users\\ms\\Desktop\\refactoringMeasurements\"\\refactoringMeasurements_" + newMeasurement.project + "_" + getCurrentDateTime() + ".json" ;
+        }
         writeToFile(FILE_PATH_REFACTORING, newMeasurement);
     }
 

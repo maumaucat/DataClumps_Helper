@@ -134,7 +134,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         long startTime;
         ReportFormat.DataClumpTypeContext dataClumpTypeContext;
-        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+        if (DiagnosticTool.REFACTORING_ENABLED) {
             startTime = System.nanoTime();
             dataClumpTypeContext = ReportFormat.getDataClumpsTypeContext(Objects.requireNonNull(currentElement), Objects.requireNonNull(otherElement), matchingProperties);
         } else {
@@ -243,7 +243,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         CodeSmellLogger.info("Refactoring done.");
 
-        if (DiagnosticTool.DIAGNOSTIC_MODE) {
+        if (DiagnosticTool.REFACTORING_ENABLED) {
             long endTime = System.nanoTime();
             long duration = (endTime - startTime);
             DiagnosticTool.addMeasurement(new DiagnosticTool.RefactoringMeasurement(project, duration, dataClumpTypeContext));

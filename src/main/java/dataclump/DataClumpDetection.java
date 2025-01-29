@@ -152,7 +152,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 // report the data clump to the full analysis if required
                 if (report) {
                     FullAnalysis.report(currentElement, otherElement, matchingProperties);
-                    if (!DiagnosticTool.DIAGNOSTIC_MODE || !Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true")) {
+                    if (!DiagnosticTool.DETECTION_ENABLED) {
                         return;
                     }
                 }
@@ -186,7 +186,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                     }
                 }
 
-                if (DiagnosticTool.DIAGNOSTIC_MODE) {
+                if (DiagnosticTool.DETECTION_ENABLED) {
                     long end = System.nanoTime();
                     long time = end - start;
                     DiagnosticTool.addMeasurement(new DiagnosticTool.DetectionMeasurement(Index.getProject(), time, ReportFormat.getDataClumpsTypeContext(currentElement, otherElement, matchingProperties)));
