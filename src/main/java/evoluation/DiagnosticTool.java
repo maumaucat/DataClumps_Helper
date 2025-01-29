@@ -111,6 +111,7 @@ public class DiagnosticTool {
         if (FILE_PATH_REFACTORING == null) {
             FILE_PATH_REFACTORING = "C:\\Users\\ms\\Desktop\\refactoringMeasurements\\refactoringMeasurements_" + newMeasurement.project + "_" + getCurrentDateTime() + ".json" ;
         }
+
         writeToFile(FILE_PATH_REFACTORING, newMeasurement);
     }
 
