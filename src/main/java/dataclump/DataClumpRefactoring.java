@@ -145,7 +145,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         // create the Dialog to select the properties that should be extracted
         DataClumpDialog dialog =
-                PsiUtil.executeInEDTAndWait(()-> new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement), Objects.requireNonNull(otherElement)));
+                PsiUtil.executeInEDTAndWait(() -> new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement), Objects.requireNonNull(otherElement)));
         assert dialog != null;
         // if the dialog was canceled -> return
         if (Boolean.FALSE.equals(PsiUtil.executeInEDTAndWait(dialog::showAndGet))) return;
@@ -874,105 +874,111 @@ public class DataClumpRefactoring implements LocalQuickFix {
         getClassfieldDefiningParameter((TypeScriptFunction) PsiUtil.runReadActionWithResult(extractedClass::getConstructor), extractedDefiningParameters, extractedDefinedClassfields);
 
         for (PsiReference functionCall : PsiUtil.runReadActionWithResult(() -> ReferencesSearch.search(function))) {
+            try {
 
-            CodeSmellLogger.info("Refactoring function call... " + PsiUtil.runReadActionWithResult(() -> functionCall.getElement().getText()));
-            JSArgumentList argumentList = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getNextSiblingOfType(functionCall.getElement(), JSArgumentList.class));
-            if (argumentList == null) continue;
-            JSExpression[] originalArguments = PsiUtil.runReadActionWithResult(argumentList::getArguments);
+                CodeSmellLogger.info("Refactoring function call... " + PsiUtil.runReadActionWithResult(() -> functionCall.getElement().getText()));
+                JSArgumentList argumentList = PsiUtil.runReadActionWithResult(() -> PsiTreeUtil.getNextSiblingOfType(functionCall.getElement(), JSArgumentList.class));
+                if (argumentList == null) continue;
+                JSExpression[] originalArguments = PsiUtil.runReadActionWithResult(argumentList::getArguments);
 
-            // create the new argument list
-            StringBuilder updatedArguments = new StringBuilder("(");
+                // create the new argument list
+                StringBuilder updatedArguments = new StringBuilder("(");
 
-            for (JSParameterListElement currentFunctionsPsiParameter : PsiUtil.runReadActionWithResult(function::getParameters)) {
+                for (JSParameterListElement currentFunctionsPsiParameter : PsiUtil.runReadActionWithResult(function::getParameters)) {
 
-                // if the next parameter expects the extracted class
-                // -> replace the argument with a constructor call for the extracted class
-                if (Objects.equals(PsiUtil.runReadActionWithResult(currentFunctionsPsiParameter::getJSType), PsiUtil.runReadActionWithResult(extractedClass::getJSType))) {
+                    // if the next parameter expects the extracted class
+                    // -> replace the argument with a constructor call for the extracted class
+                    if (Objects.equals(PsiUtil.runReadActionWithResult(currentFunctionsPsiParameter::getJSType), PsiUtil.runReadActionWithResult(extractedClass::getJSType))) {
 
-                    updatedArguments.append("new ").append(PsiUtil.getName(extractedClass)).append("(");
-                    for (Property extractedClassProperty : extractedParameters) {
+                        updatedArguments.append("new ").append(PsiUtil.getName(extractedClass)).append("(");
+                        for (Property extractedClassProperty : extractedParameters) {
 
-                        if (!dataClump.contains(extractedClassProperty)) {
-                            updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
-                            continue;
-                        }
-
-                        if (!PsiUtil.runReadActionWithResult(function::isConstructor)) {
-
-                            if (extractedClassProperty instanceof Classfield) {
-                                int index = originalParameters.indexOf(extractedClassProperty);
-                                if (index == -1) {
-                                    CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
-                                    continue;
-                                }
-                                updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
-                            } else if (extractedClassProperty instanceof Parameter) {
-                                Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
-                                int index = originalParameters.indexOf(definedClassfield);
-                                if (index == -1) {
-                                    CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
-                                    continue;
-                                }
-                                updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
+                            if (!dataClump.contains(extractedClassProperty)) {
+                                updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
+                                continue;
                             }
 
-                        } else {
-                            // if the function is a constructor -> use the defined classfields and default values
-                            assert originalDefinedClassfields != null;
-                            assert defaultValues != null;
+                            if (!PsiUtil.runReadActionWithResult(function::isConstructor)) {
 
-                            if (extractedClassProperty instanceof Classfield) {
-
-                                if (originalDefinedClassfields.containsKey(extractedClassProperty)) { // if the property is defined in the constructor -> use the corresponding parameter
-                                    int index = originalParameters.indexOf(originalDefinedClassfields.get(extractedClassProperty));
+                                if (extractedClassProperty instanceof Classfield) {
+                                    int index = originalParameters.indexOf(extractedClassProperty);
+                                    if (index == -1) {
+                                        CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
+                                        continue;
+                                    }
                                     updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
-                                } else if (defaultValues.containsKey(extractedClassProperty)) { // if the property has a default value -> use the default value
-                                    updatedArguments.append(defaultValues.get(extractedClassProperty)).append(", ");
-                                } else { // if the property is not defined in the constructor and has no default value -> use undefined
-                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
+                                } else if (extractedClassProperty instanceof Parameter) {
+                                    Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
+                                    int index = originalParameters.indexOf(definedClassfield);
+                                    if (index == -1) {
+                                        CodeSmellLogger.error("Property " + extractedClassProperty.getName() + " not found in original parameters", new IndexOutOfBoundsException());
+                                        continue;
+                                    }
+                                    updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
                                 }
 
-                            } else if (extractedClassProperty instanceof Parameter) {
-                                Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
+                            } else {
+                                // if the function is a constructor -> use the defined classfields and default values
+                                assert originalDefinedClassfields != null;
+                                assert defaultValues != null;
 
-                                if (originalDefinedClassfields.containsKey(definedClassfield)) { // if the property is defined in the constructor -> use the corresponding parameter
-                                    int index = originalParameters.indexOf(originalDefinedClassfields.get(definedClassfield));
-                                    updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
-                                } else if (defaultValues.containsKey(definedClassfield)) { // if the property has a default value -> use the default value
-                                    updatedArguments.append(defaultValues.get(definedClassfield)).append(", ");
-                                } else { // if the property is not defined in the constructor and has no default value -> use undefined
-                                    updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
+                                if (extractedClassProperty instanceof Classfield) {
+
+                                    if (originalDefinedClassfields.containsKey(extractedClassProperty)) { // if the property is defined in the constructor -> use the corresponding parameter
+                                        int index = originalParameters.indexOf(originalDefinedClassfields.get(extractedClassProperty));
+                                        updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
+                                    } else if (defaultValues.containsKey(extractedClassProperty)) { // if the property has a default value -> use the default value
+                                        updatedArguments.append(defaultValues.get(extractedClassProperty)).append(", ");
+                                    } else { // if the property is not defined in the constructor and has no default value -> use undefined
+                                        updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
+                                    }
+
+                                } else if (extractedClassProperty instanceof Parameter) {
+                                    Classfield definedClassfield = extractedDefiningParameters.get(extractedClassProperty);
+
+                                    if (originalDefinedClassfields.containsKey(definedClassfield)) { // if the property is defined in the constructor -> use the corresponding parameter
+                                        int index = originalParameters.indexOf(originalDefinedClassfields.get(definedClassfield));
+                                        updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[index]::getText)).append(", ");
+                                    } else if (defaultValues.containsKey(definedClassfield)) { // if the property has a default value -> use the default value
+                                        updatedArguments.append(defaultValues.get(definedClassfield)).append(", ");
+                                    } else { // if the property is not defined in the constructor and has no default value -> use undefined
+                                        updatedArguments.append(DefaultValues.getDefaultValue(extractedClassProperty)).append(", ");
+                                    }
                                 }
+
+
                             }
-
-
                         }
+                        // Remove trailing comma
+                        if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
+                            updatedArguments.setLength(updatedArguments.length() - 2);
+                        }
+                        updatedArguments.append(")");
+                    } else {
+                        // Append original arguments
+                        updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) currentFunctionsPsiParameter))]::getText));
                     }
-                    // Remove trailing comma
-                    if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
-                        updatedArguments.setLength(updatedArguments.length() - 2);
-                    }
-                    updatedArguments.append(")");
-                } else {
-                    // Append original arguments
-                    updatedArguments.append(PsiUtil.runReadActionWithResult(originalArguments[originalParameters.indexOf(new Parameter((TypeScriptParameter) currentFunctionsPsiParameter))]::getText));
+                    updatedArguments.append(", ");
                 }
-                updatedArguments.append(", ");
-            }
 
-            // Remove trailing comma and close the argument list
-            if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
-                updatedArguments.setLength(updatedArguments.length() - 2);
-            }
-            updatedArguments.append(")");
+                // Remove trailing comma and close the argument list
+                if (updatedArguments.charAt(updatedArguments.length() - 2) == ',') {
+                    updatedArguments.setLength(updatedArguments.length() - 2);
+                }
+                updatedArguments.append(")");
 
-            // Update the function call with the new argument list
-            WriteCommandAction.runWriteCommandAction(function.getProject(), () -> {
-                JSExpression newArguments = JSPsiElementFactory.createJSExpression(updatedArguments.toString(), argumentList);
-                argumentList.replace(newArguments);
-                PsiDocumentManager.getInstance(function.getProject()).commitAllDocuments();
-            });
+                // Update the function call with the new argument list
+                WriteCommandAction.runWriteCommandAction(function.getProject(), () -> {
+                    JSExpression newArguments = JSPsiElementFactory.createJSExpression(updatedArguments.toString(), argumentList);
+                    argumentList.replace(newArguments);
+                    PsiDocumentManager.getInstance(function.getProject()).commitAllDocuments();
+                });
+            } catch (Exception e) {
+                CodeSmellLogger.warn("Function call + " + PsiUtil.runReadActionWithResult(() -> functionCall.getElement().getText()) + " could not be refactored. \n" + e.getMessage() +
+                        "\n Continuing...");
+            }
         }
+
     }
 
     /**
