@@ -153,7 +153,7 @@ public class DataClumpDetection extends LocalInspectionTool {
                 if (report) {
                     FullAnalysis.report(currentElement, otherElement, matchingProperties);
                     if (!DiagnosticTool.DETECTION_ENABLED) {
-                        return;
+                        continue;
                     }
                 }
 
@@ -163,10 +163,10 @@ public class DataClumpDetection extends LocalInspectionTool {
 
                         PsiElement dataClumpElement;
                         if (currentElement instanceof JSClass currentClass) {
-                            dataClumpElement = PsiUtil.getPsiField(currentClass, property.getName());
+                            dataClumpElement = PsiUtil.getPsiField(currentClass, (Classfield) property);
                         } else {
                             TypeScriptFunction currentFunction = (TypeScriptFunction) currentElement;
-                            dataClumpElement = PsiUtil.getPsiParameter(currentFunction, property.getName());
+                            dataClumpElement = PsiUtil.getPsiParameter(currentFunction, property);
                         }
 
                         assert dataClumpElement != null;

@@ -48,7 +48,7 @@ public class ReportFormat {
             if (fromElement instanceof JSClass) {
                 fromVariable = PsiUtil.getPsiField((JSClass) fromElement, (Classfield) property);
             } else {
-                fromVariable = PsiUtil.getPsiParameter((TypeScriptFunction) fromElement, property.getName());
+                fromVariable = PsiUtil.getPsiParameter((TypeScriptFunction) fromElement, property);
             }
             if (toElement instanceof JSClass) {
                  toVariable = PsiUtil.getPsiField((JSClass) toElement, (Classfield) property);
