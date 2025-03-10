@@ -23,15 +23,13 @@ public class DataClumpUtil {
      * Invokes the data clump inspection on the given element.
      *
      * @param psiElement the element to be inspected
-     * @return the problems holder containing the inspection results or null if the element is invalid
      */
-    public static ProblemsHolder invokeInspection(@NotNull PsiElement psiElement) {
+    public static void invokeInspection(@NotNull PsiElement psiElement) {
 
         // the inspection can only be invoked on functions, parameter lists or classes
         if (!(psiElement instanceof TypeScriptFunction || psiElement instanceof JSParameterList || psiElement instanceof JSClass)) {
-            CodeSmellLogger.warn("Invoking inspection on invalid element: " + PsiUtil.getQualifiedName(psiElement) +
-                    " of type " + psiElement.getClass() + " will not do anything. Skipping.");
-            return null;
+            CodeSmellLogger.warn("Invoking inspection on invalid element: " + PsiUtil.getQualifiedName(psiElement) + " of type " + psiElement.getClass() + " will not do anything. Skipping.");
+            return;
         }
 
         // if the element is a function, get the parameter list
@@ -44,11 +42,7 @@ public class DataClumpUtil {
         PsiFile psiFile = PsiUtil.runReadActionWithResult(psiElement::getContainingFile);
         Project project = PsiUtil.runReadActionWithResult(psiFile::getProject);
 
-        ProblemsHolder problemsHolder = new ProblemsHolder(
-                InspectionManager.getInstance(project),
-                psiFile,
-                false
-        );
+        ProblemsHolder problemsHolder = new ProblemsHolder(InspectionManager.getInstance(project), psiFile, false);
 
         DataClumpDetection inspection = new DataClumpDetection();
         PsiElementVisitor visitor = inspection.buildVisitor(problemsHolder, false);
@@ -56,6 +50,5 @@ public class DataClumpUtil {
         @NotNull PsiElement finalPsiElement1 = psiElement;
         ApplicationManager.getApplication().runReadAction(() -> finalPsiElement1.accept(visitor));
 
-        return problemsHolder;
     }
 }

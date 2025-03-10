@@ -15,10 +15,21 @@ import java.util.Objects;
  */
 public class DataClumpSettingsUI {
 
-
+    /**
+     * The main panel of the settings UI
+     */
     private final JPanel mainPanel;
+    /**
+     * The combo box for selecting the number of properties that should be equal in order to be considered a data clump
+     */
     private final ComboBox<Integer> numberOfProperties;
+    /**
+     * The combo box for selecting the modifier types that should be considered when detecting data clumps
+     */
     private final ComboBox<DataClumpSettings.Modifier> includeModifiersInDetection = new ComboBox<>(DataClumpSettings.Modifier.values());
+    /**
+     * The combo box for selecting the modifier types that should be included in the extracted class
+     */
     private final ComboBox<DataClumpSettings.Modifier> includeModifiersInExtractedClass = new ComboBox<>();
 
     /**
@@ -43,25 +54,10 @@ public class DataClumpSettingsUI {
         includeModifiersInExtractedClass.setSelectedItem(DataClumpSettings.getInstance().getState().includeModifiersInExtractedClass);
 
         String TOOLTIP_NUMBER_OF_PROPERTIES = "The minimal number of fields or parameters that should be equal in order to be considered a data clump.";
-        String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "Select the modifier types that should be considered when detecting data clumps. " +
-                "In case of ALL the fields must have the same modifiers to be considered equal. " +
-                "In case of VISIBILITY, only the visibility of the fields will be considered. " +
-                "In case of NONE, the modifiers of the fields will not be considered.";
-        String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "Select the modifier types that should be included in the extracted class. " +
-                "In case the class is newly created. " +
-                "In case of ALL all modifiers will be included in the extracted class. " +
-                "In case of VISIBILITY only the visibility modifiers will be included in the extracted class. " +
-                "In case of NONE no modifiers will be included in the extracted class." +
-                "The selected modifier must be included in the detected data clumps.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION = "Select the modifier types that should be considered when detecting data clumps. " + "In case of ALL the fields must have the same modifiers to be considered equal. " + "In case of VISIBILITY, only the visibility of the fields will be considered. " + "In case of NONE, the modifiers of the fields will not be considered.";
+        String TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS = "Select the modifier types that should be included in the extracted class. " + "In case the class is newly created. " + "In case of ALL all modifiers will be included in the extracted class. " + "In case of VISIBILITY only the visibility modifiers will be included in the extracted class. " + "In case of NONE no modifiers will be included in the extracted class." + "The selected modifier must be included in the detected data clumps.";
 
-        mainPanel = FormBuilder.createFormBuilder()
-                .addComponent(new JBLabel("Settings for data clump detection: "))
-                .addLabeledComponent(new JBLabel("Number of Fields or Parameters: "), addHelpToolTip(numberOfProperties, TOOLTIP_NUMBER_OF_PROPERTIES), 1, false)
-                .addLabeledComponent(new JBLabel("Include modifiers in detection: "),addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1)
-                .addComponent(new JBLabel("Settings for extracting class: "))
-                .addLabeledComponent(new JBLabel("Include modifiers in the extracted class: "),addHelpToolTip(includeModifiersInExtractedClass, TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS), 1)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
+        mainPanel = FormBuilder.createFormBuilder().addComponent(new JBLabel("Settings for data clump detection: ")).addLabeledComponent(new JBLabel("Number of Fields or Parameters: "), addHelpToolTip(numberOfProperties, TOOLTIP_NUMBER_OF_PROPERTIES), 1, false).addLabeledComponent(new JBLabel("Include modifiers in detection: "), addHelpToolTip(includeModifiersInDetection, TOOLTIP_INCLUDE_MODIFIERS_IN_DETECTION), 1).addComponent(new JBLabel("Settings for extracting class: ")).addLabeledComponent(new JBLabel("Include modifiers in the extracted class: "), addHelpToolTip(includeModifiersInExtractedClass, TOOLTIP_INCLUDE_MODIFIERS_IN_EXTRACTED_CLASS), 1).addComponentFillVertically(new JPanel(), 0).getPanel();
 
 
         // only the detected modifier can be selected in the extracted class

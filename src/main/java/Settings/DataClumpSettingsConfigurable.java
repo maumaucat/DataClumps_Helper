@@ -52,7 +52,6 @@ final class DataClumpSettingsConfigurable implements Configurable {
         state.includeModifiersInExtractedClass = mySettingsComponent.getIncludeModifiersInExtractedClass();
     }
 
-
     @Override
     public void reset() {
         DataClumpSettings.State state =

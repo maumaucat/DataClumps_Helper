@@ -11,19 +11,14 @@ import org.jetbrains.annotations.NotNull;
  * Represents the settings for the data clump detection and extraction.
  * Stores the settings in the project settings.
  */
-@State(
-        name = "Settings.DataClumpSettings.java",
-        storages = @Storage("Settings.DataClumpSettings.xml")
-)
+@State(name = "Settings.DataClumpSettings.java", storages = @Storage("Settings.DataClumpSettings.xml"))
 public final class DataClumpSettings implements PersistentStateComponent<DataClumpSettings.State> {
 
     /**
      * Represents the modifier types that can be considered
      */
     public enum Modifier {
-        ALL,
-        VISIBILITY,
-        NONE
+        ALL, VISIBILITY, NONE
     }
 
     /**
@@ -47,8 +42,7 @@ public final class DataClumpSettings implements PersistentStateComponent<DataClu
      * @return The instance of the settings
      */
     public static DataClumpSettings getInstance() {
-        return ApplicationManager.getApplication()
-                .getService(DataClumpSettings.class);
+        return ApplicationManager.getApplication().getService(DataClumpSettings.class);
     }
 
     @Override

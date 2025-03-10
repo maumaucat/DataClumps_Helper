@@ -157,10 +157,7 @@ public class DataClumpDialog extends DialogWrapper {
         JLabel tip = new JBLabel(IconLoader.getIcon("/icons/contextHelp.svg", getClass()));
         HelpTooltip helpTooltip = new HelpTooltip();
 
-        String DATACLUMP_EXPLANATION = "Data Clumps are defined by <a href='https://martinfowler.com/bliki/DataClump.html'>Fowler</a> as a group of parameters " +
-                "or fields that appear together repeatedly at various places in the code, possibly in different orders." +
-                " These can be a sign that the code needs to be refactored. " +
-                "This refactoring allows you to extract these parameters or fields into a new class.";
+        String DATACLUMP_EXPLANATION = "Data Clumps are defined by <a href='https://martinfowler.com/bliki/DataClump.html'>Fowler</a> as a group of parameters " + "or fields that appear together repeatedly at various places in the code, possibly in different orders." + " These can be a sign that the code needs to be refactored. " + "This refactoring allows you to extract these parameters or fields into a new class.";
 
         helpTooltip.setDescription(DATACLUMP_EXPLANATION);
         helpTooltip.installOn(tip);
@@ -204,12 +201,7 @@ public class DataClumpDialog extends DialogWrapper {
         FileChooserDescriptor descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
         descriptor.setRoots(project.getBaseDir());
 
-        directoryBrowseButton.addBrowseFolderListener(
-                "Choose Directory",
-                "Choose the target directory for the new class",
-                null,
-                descriptor
-        );
+        directoryBrowseButton.addBrowseFolderListener("Choose Directory", "Choose the target directory for the new class", null, descriptor);
 
         // default directory is the directory of the element from which the refactoring is triggered
         directoryBrowseButton.setText(current.getContainingFile().getContainingDirectory().getVirtualFile().getPath());

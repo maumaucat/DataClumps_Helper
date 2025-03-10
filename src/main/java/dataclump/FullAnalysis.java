@@ -180,20 +180,14 @@ public class FullAnalysis extends AnAction {
                             List<Parameter> parameters = Index.getFunctionsToParameters().get(psiElement);
                             numberOfMethodParameters += parameters != null ? parameters.size() : 0;
                             if (parameters != null && parameters.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                                inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                        InspectionManager.getInstance(project),
-                                        psiFile,
-                                        false
-                                ), true);
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(InspectionManager.getInstance(project), psiFile, false), true);
                             }
                         }
 
                         // collect all classes in the file in a read action
                         Collection<PsiElement> allClasses = new ArrayList<>();
                         ApplicationManager.getApplication().runReadAction(() -> {
-                            allClasses.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                                    element instanceof TypeScriptClass
-                            )));
+                            allClasses.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element -> element instanceof TypeScriptClass)));
                         });
 
                         // iterate all classes in the file and collect the data clump problems
@@ -202,11 +196,7 @@ public class FullAnalysis extends AnAction {
                             List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
                             numberOfDataFields += classfields != null ? classfields.size() : 0;
                             if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                                inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                        InspectionManager.getInstance(project),
-                                        psiFile,
-                                        false
-                                ), true);
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(InspectionManager.getInstance(project), psiFile, false), true);
                             }
 
                         }
@@ -214,9 +204,7 @@ public class FullAnalysis extends AnAction {
                         // collect all interfaces in the file in a read action
                         Collection<PsiElement> allInterfaces = new ArrayList<>();
                         ApplicationManager.getApplication().runReadAction(() -> {
-                            allInterfaces.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element ->
-                                    element instanceof TypeScriptInterface
-                            )));
+                            allInterfaces.addAll(List.of(PsiTreeUtil.collectElements(psiFile, element -> element instanceof TypeScriptInterface)));
                         });
 
                         // iterate all interfaces in the file and collect the data clump problems
@@ -225,11 +213,7 @@ public class FullAnalysis extends AnAction {
                             List<Classfield> classfields = Index.getClassesToClassFields().get((JSClass) psiElement);
                             numberOfDataFields += classfields != null ? classfields.size() : 0;
                             if (classfields != null && classfields.size() >= Objects.requireNonNull(DataClumpSettings.getInstance().getState()).minNumberOfProperties) {
-                                inspection.detectDataClump(psiElement, new ProblemsHolder(
-                                        InspectionManager.getInstance(project),
-                                        psiFile,
-                                        false
-                                ), true);
+                                inspection.detectDataClump(psiElement, new ProblemsHolder(InspectionManager.getInstance(project), psiFile, false), true);
                             }
                         }
 
@@ -249,51 +233,16 @@ public class FullAnalysis extends AnAction {
                     options.put("INCLUDE_MODIFIERS_IN_DETECTION", String.valueOf(Objects.requireNonNull(DataClumpSettings.getInstance().getState()).includeModifiersInDetection));
 
                     // information about the detector (this Plugin)
-                    ReportFormat.DataClumpsDetectorContext detector = new ReportFormat.DataClumpsDetectorContext(
-                            "Data Clump Helper",
-                            null,
-                            Objects.requireNonNull(PluginManagerCore.getPlugin(PluginId.getId("de.marlena.data.clump.helper"))).getVersion(),
-                            options
-                    );
+                    ReportFormat.DataClumpsDetectorContext detector = new ReportFormat.DataClumpsDetectorContext("Data Clump Helper", null, Objects.requireNonNull(PluginManagerCore.getPlugin(PluginId.getId("de.marlena.data.clump.helper"))).getVersion(), options);
 
                     // summary information for the report (amount of data clumps, files, classes, methods, and fields etc)
-                    ReportFormat.ReportSummary summary = new ReportFormat.ReportSummary(
-                            amountDataClumps,
-                            filesWithDataClumps.size(),
-                            classesOrInterfacesWithDataClumps.size(),
-                            methodsWithDataClumps.size(),
-                            fieldsToFieldsDataClump,
-                            parametersToFieldsDataClump,
-                            parametersToParametersDataClump,
-                            ""
-                    );
+                    ReportFormat.ReportSummary summary = new ReportFormat.ReportSummary(amountDataClumps, filesWithDataClumps.size(), classesOrInterfacesWithDataClumps.size(), methodsWithDataClumps.size(), fieldsToFieldsDataClump, parametersToFieldsDataClump, parametersToParametersDataClump, "");
 
                     // information about the project
-                    ReportFormat.ProjectInfo projectInfo = new ReportFormat.ProjectInfo(
-                            null,
-                            project.getName(),
-                            null,
-                            null,
-                            null,
-                            null,
-                            typescriptFiles.size(),
-                            numberOfClassesOrInterfaces,
-                            numberOfMethods,
-                            numberOfDataFields,
-                            numberOfMethodParameters,
-                            ""
-                    );
+                    ReportFormat.ProjectInfo projectInfo = new ReportFormat.ProjectInfo(null, project.getName(), null, null, null, null, typescriptFiles.size(), numberOfClassesOrInterfaces, numberOfMethods, numberOfDataFields, numberOfMethodParameters, "");
 
                     // create the context for the report
-                    ReportFormat.DataClumpsTypeContext context = new ReportFormat.DataClumpsTypeContext(
-                            "1.0",
-                            detector,
-                            dataClumps,
-                            getCurrentDateTime(),
-                            "TypeScript",
-                            summary,
-                            projectInfo
-                    );
+                    ReportFormat.DataClumpsTypeContext context = new ReportFormat.DataClumpsTypeContext("1.0", detector, dataClumps, getCurrentDateTime(), "TypeScript", summary, projectInfo);
 
                     // write the context to the file
                     writeToFile(context, resultPath);
@@ -317,8 +266,8 @@ public class FullAnalysis extends AnAction {
      * is invoked by the full analysis.
      *
      * @param fromElement the element from where the data clump is detected
-     * @param toElement the element with whom the data clump is detected
-     * @param variables the variables that are clumped (fields or parameters)
+     * @param toElement   the element with whom the data clump is detected
+     * @param variables   the variables that are clumped (fields or parameters)
      */
     public static void report(PsiElement fromElement, PsiElement toElement, List<Property> variables) {
         amountDataClumps++;
@@ -348,7 +297,7 @@ public class FullAnalysis extends AnAction {
     /**
      * Writes the context to a JSON file.
      *
-     * @param context the context to write to the file
+     * @param context    the context to write to the file
      * @param resultPath the path to write the file to
      */
     private static void writeToFile(ReportFormat.DataClumpsTypeContext context, String resultPath) {

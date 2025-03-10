@@ -1,7 +1,6 @@
 package util;
 
 import com.google.gson.annotations.SerializedName;
-import com.google.rpc.Code;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptField;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptFunction;
 import com.intellij.lang.javascript.psi.ecma6.TypeScriptParameter;

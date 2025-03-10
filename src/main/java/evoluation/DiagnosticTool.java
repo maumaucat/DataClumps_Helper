@@ -59,7 +59,7 @@ public class DiagnosticTool {
         }
         String detectionEnabled = Objects.equals(System.getProperty("dataclump.diagnostic.includeDetection"), "true") ? "_Detection_" : "";
         FILE_PATH_DETECTION = resultPath + "\\detectionMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
-        FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_"+ detectionEnabled  + project.getName() + "_" + getCurrentDateTime() + ".json";
+        FILE_PATH_FULL_ANALYSIS = resultPath + "\\fullAnalysisMeasurements_" + detectionEnabled + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_INDEX = resultPath + "\\indexMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
         FILE_PATH_REFACTORING = resultPath + "\\refactoringMeasurements_" + project.getName() + "_" + getCurrentDateTime() + ".json";
 
@@ -109,7 +109,7 @@ public class DiagnosticTool {
      */
     public static void addMeasurement(RefactoringMeasurement newMeasurement) {
         if (FILE_PATH_REFACTORING == null) {
-            FILE_PATH_REFACTORING = "C:\\Users\\ms\\Documents\\Uni\\Bachlor\\AnalysisResults\\Refactoring\\refactoring_" + newMeasurement.project + "_" + getCurrentDateTime() + ".json" ;
+            FILE_PATH_REFACTORING = "C:\\Users\\ms\\Documents\\Uni\\Bachlor\\AnalysisResults\\Refactoring\\refactoring_" + newMeasurement.project + "_" + getCurrentDateTime() + ".json";
         }
 
         writeToFile(FILE_PATH_REFACTORING, newMeasurement);

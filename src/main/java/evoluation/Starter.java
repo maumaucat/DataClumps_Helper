@@ -8,12 +8,16 @@ import util.CodeSmellLogger;
 
 import java.util.Objects;
 
+/**
+ * This class is used to start the diagnostic tool if the flag is set on startup of the application.
+ */
 public class Starter implements AppLifecycleListener {
 
-
+    /**
+     * Called when the application is started.
+     */
     @Override
     public void appStarted() {
-
         if (Objects.equals(System.getProperty("dataclump.diagnostic.tool"), "true")) {
             Project project = openProject();
             if (project != null) {
@@ -22,6 +26,11 @@ public class Starter implements AppLifecycleListener {
         }
     }
 
+    /**
+     * Opens the project that is specified in the system properties.
+     *
+     * @return the project that was opened or null if the project could not be opened
+     */
     public Project openProject() {
 
         String projectPath = System.getProperty("dataclump.projectpath");

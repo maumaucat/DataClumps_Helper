@@ -144,8 +144,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
 
         // create the Dialog to select the properties that should be extracted
-        DataClumpDialog dialog =
-                PsiUtil.executeInEDTAndWait(() -> new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement), Objects.requireNonNull(otherElement)));
+        DataClumpDialog dialog = PsiUtil.executeInEDTAndWait(() -> new DataClumpDialog(this, matchingProperties, Objects.requireNonNull(currentElement), Objects.requireNonNull(otherElement)));
         assert dialog != null;
         // if the dialog was canceled -> return
         if (Boolean.FALSE.equals(PsiUtil.executeInEDTAndWait(dialog::showAndGet))) return;
@@ -458,7 +457,6 @@ public class DataClumpRefactoring implements LocalQuickFix {
             }
         }
     }
-
 
     /**
      * Adds getter and setter to the extracted class for the given properties if they do not already exist.
@@ -974,8 +972,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                     PsiDocumentManager.getInstance(function.getProject()).commitAllDocuments();
                 });
             } catch (Exception e) {
-                CodeSmellLogger.warn("Function call + " + PsiUtil.runReadActionWithResult(() -> functionCall.getElement().getText()) + " could not be refactored. \n" + e.getMessage() +
-                        "\n Continuing...");
+                CodeSmellLogger.warn("Function call + " + PsiUtil.runReadActionWithResult(() -> functionCall.getElement().getText()) + " could not be refactored. \n" + e.getMessage() + "\n Continuing...");
             }
         }
 
@@ -1299,13 +1296,37 @@ public class DataClumpRefactoring implements LocalQuickFix {
         return false;
     }
 
+    /**
+     * This class contains the default values for the different types of properties.
+     */
     private static class DefaultValues {
+        /**
+         * The default value for an undefined property.
+         */
         private static final String UNDEFINED = "undefined";
+        /**
+         * The default values for the different types of properties.
+         */
         private static final String STRING = "\"\"";
+        /**
+         * The default value for a number property.
+         */
         private static final String NUMBER = "0";
+        /**
+         * The default value for a boolean property.
+         */
         private static final String BOOLEAN = "false";
+        /**
+         * The default value for a property with any type.
+         */
         private static final String ANY = "undefined";
 
+        /**
+         * Returns the default value for the given property.
+         *
+         * @param property the property to get the default value for
+         * @return the default value for the given property
+         */
         public static String getDefaultValue(Property property) {
             for (String type : property.getTypes()) {
                 switch (type) {
@@ -1324,6 +1345,7 @@ public class DataClumpRefactoring implements LocalQuickFix {
                 }
             }
 
+            // if the type is not specified -> ask the user for a default value
             AtomicReference<String> input = new AtomicReference<>();
             ApplicationManager.getApplication().invokeLater(() -> {
                 do {
@@ -1334,6 +1356,5 @@ public class DataClumpRefactoring implements LocalQuickFix {
 
         }
     }
-
 
 }

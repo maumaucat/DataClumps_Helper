@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
 import Settings.DataClumpSettings;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The Data Clump Detection Inspection.
@@ -24,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
  * the Data Clump Refactoring to refactor the data clumps.
  */
 public class DataClumpDetection extends LocalInspectionTool {
-
 
     /**
      * Build the visitor for the inspection
